@@ -27,20 +27,22 @@ public class main {
         var gui = new ListDisplayPanel();
         boolean init = false;
 
+        // Config
+        Config config = new Config(1000, 0.1);
+
         for (String imageFile : imageFiles){
             // load images
             BufferedImage img = UtilImageIO.loadImageNotNull(imageFile);
 
             // detect features
-            feat feat = features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null));
-            Camera camera = new Camera(cameras.size(), imageFile, img, feat.getkps(), feat.getdscs(), feat.gettrackids());
+            feat cfeat = features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config);
+            Camera camera = new Camera(cameras.size(), imageFile, img, cfeat.getkps(), cfeat.getdscs(), cfeat.gettrackids());
             cameras.add(camera);
-
 
             int id = cameras.size() - 1;
             if (id != 0) {
                 // match features
-                FastAccess<AssociatedIndex> idxpair = features.match(cameras.get(id).dscs, cameras.get(id - 1).dscs);
+                FastAccess<AssociatedIndex> idxpair = features.match(cameras.get(id).dscs, cameras.get(id - 1).dscs, config);
 
                 // mapping
                 features.map(tracks, cameras, idxpair);
@@ -57,4 +59,3 @@ public class main {
         ShowImages.showWindow(gui,"detected features", true);
     }
 }
-

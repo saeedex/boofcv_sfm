@@ -40,42 +40,30 @@ final class feat {
     }
 }
 public class features {
-    public static feat detect(GrayF32 image){
-        // create the detector and descriptors
-        ConfigFastHessian configDetector = new ConfigFastHessian();
-        configDetector.extract = new ConfigExtract(2, 0, 5, true);
-        configDetector.maxFeaturesPerScale = 1000;
-        configDetector.initialSampleStep = 2;
-
-        DetectDescribePoint<GrayF32,TupleDesc_F64> detDesc = FactoryDetectDescribe.
-                surfStable(configDetector, null, null,GrayF32.class);
-
+    public static feat detect(GrayF32 image, Config config){
         // specify the image to process
-        detDesc.detect(image);
-        System.out.println("Found Features: "+detDesc.getNumberOfFeatures());
+        config.describer.detect(image);
+        System.out.println("Found Features: "+config.describer.getNumberOfFeatures());
 
         // store output
         List<Point2D_F64> points = new ArrayList<>();
-        DogArray<TupleDesc_F64> desc = UtilFeature.createArray(detDesc, 100);
+        DogArray<TupleDesc_F64> desc = UtilFeature.createArray(config.describer, 100);
         List<Integer> idx = new ArrayList<>();
 
-        for (int i = 0; i < detDesc.getNumberOfFeatures(); i++) {
-            points.add(detDesc.getLocation(i).copy());
-            desc.grow().setTo(detDesc.getDescription(i));
+        for (int i = 0; i < config.describer.getNumberOfFeatures(); i++) {
+            points.add(config.describer.getLocation(i).copy());
+            desc.grow().setTo(config.describer.getDescription(i));
             idx.add(-1);
         }
 
         return new feat(points, desc, idx);
     }
 
-    public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> descA, DogArray<TupleDesc_F64> descB){
-        ScoreAssociation<TupleDesc_F64> scorer = FactoryAssociation.scoreEuclidean(TupleDesc_F64.class, true);
-        AssociateDescription<TupleDesc_F64> matchAB = FactoryAssociation.greedy(new ConfigAssociateGreedy(true, 0.1), scorer);
-
-        matchAB.setSource(descA);
-        matchAB.setDestination(descB);
-        matchAB.associate();
-        FastAccess<AssociatedIndex> idxpair = matchAB.getMatches();
+    public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> descA, DogArray<TupleDesc_F64> descB, Config config){
+        config.matcher.setSource(descA);
+        config.matcher.setDestination(descB);
+        config.matcher.associate();
+        FastAccess<AssociatedIndex> idxpair = config.matcher.getMatches();
         return idxpair;
     }
 

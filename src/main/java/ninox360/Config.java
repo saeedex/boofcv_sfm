@@ -6,6 +6,7 @@ import boofcv.abst.feature.detdesc.DetectDescribePoint;
 import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
 import boofcv.alg.geo.PerspectiveOps;
+import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.factory.feature.associate.ConfigAssociateGreedy;
 import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
@@ -14,6 +15,7 @@ import boofcv.struct.calib.CameraPinholeBrown;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.image.GrayF32;
+import georegression.struct.se.Se3_F64;
 import org.ddogleg.fitting.modelset.ModelFitter;
 import org.ddogleg.fitting.modelset.ModelMatcher;
 import org.ejml.data.DMatrixRMaj;
@@ -23,6 +25,10 @@ public class Config {
     DetectDescribePoint<GrayF32, TupleDesc_F64> describer;
     ScoreAssociation<TupleDesc_F64> scorer;
     AssociateDescription<TupleDesc_F64> matcher;
+
+    ConfigRansac ransac;
+    ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
+
     ModelMatcher<DMatrixRMaj, AssociatedPair> funRansac;
     ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
     ModelFitter<DMatrixRMaj, AssociatedPair> refine;
@@ -55,6 +61,7 @@ public class Config {
         configEssential.numResolve = 2;
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
 
+        this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
         this.funRansac = FactoryMultiViewRobust.fundamentalRansac(configFundamental, configRansac);
         this.essRansac = FactoryMultiViewRobust.essentialRansac(configEssential, configRansac);
         this.refine = FactoryMultiView.fundamentalRefine(1e-8, 400, EpipolarError.SAMPSON);

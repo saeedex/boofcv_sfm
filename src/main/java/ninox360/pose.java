@@ -35,25 +35,22 @@ public class pose {
 
         List<AssociatedPair> matchedCalibrated = convertToNormalizedCoordinates(matches, config.intrinsic);
         List<AssociatedPair> inliers = new ArrayList<>();
-        Se3_F64 pose = estimateCameraMotion(config.intrinsic, matchedCalibrated, inliers);
+        Se3_F64 pose = estimateCameraMotion(config.intrinsic, matchedCalibrated, inliers, config);
         System.out.println(pose);
         config.init = true;
         return pose;
     }
-    public static Se3_F64 estimateCameraMotion( CameraPinholeBrown intrinsic,
-                                                List<AssociatedPair> matchedNorm, List<AssociatedPair> inliers ) {
-        ModelMatcherMultiview<Se3_F64, AssociatedPair> epipolarMotion =
-                FactoryMultiViewRobust.baselineRansac(new ConfigEssential(), new ConfigRansac(200, 0.5));
-        epipolarMotion.setIntrinsic(0, intrinsic);
-        epipolarMotion.setIntrinsic(1, intrinsic);
+    public static Se3_F64 estimateCameraMotion(CameraPinholeBrown intrinsic, List<AssociatedPair> matchedNorm, List<AssociatedPair> inliers, Config config) {
+        config.epiMotion.setIntrinsic(0, intrinsic);
+        config.epiMotion.setIntrinsic(1, intrinsic);
 
-        if (!epipolarMotion.process(matchedNorm))
+        if (!config.epiMotion.process(matchedNorm))
             throw new RuntimeException("Motion estimation failed");
 
         // save inlier set for debugging purposes
-        inliers.addAll(epipolarMotion.getMatchSet());
+        inliers.addAll(config.epiMotion.getMatchSet());
 
-        return epipolarMotion.getModelParameters();
+        return config.epiMotion.getModelParameters();
     }
     public static List<AssociatedPair> convertToNormalizedCoordinates( List<AssociatedPair> matchedFeatures, CameraPinholeBrown intrinsic ) {
 

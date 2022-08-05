@@ -21,7 +21,7 @@ import java.util.List;
  */
 public class main {
     public static void main(String[] args) {
-        String imageDirectory = "../dataset/";
+        String imageDirectory = "/Users/saad/Documents/slam/pyDex3D/dataset/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<Camera> cameras = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
@@ -51,15 +51,16 @@ public class main {
 
                 if (!config.init)
                     kpose = pose.init(tracks, cameras, config);
+                    break;
 
             }
         }
         // Visualization
-        for ( Camera camera : cameras){
-            camera.viewkps();
-            camera.viewtracks();
-            gui.addImage(camera.img, camera.file);
-        }
-        ShowImages.showWindow(gui,"detected features", true);
+//        for ( Camera camera : cameras){
+//            camera.viewkps();
+//            camera.viewtracks();
+//            gui.addImage(camera.img, camera.file);
+//        }
+//        ShowImages.showWindow(gui,"detected features", true);
     }
 }

@@ -4,9 +4,16 @@ import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.abst.geo.Triangulate2ViewsMetricH;
 import boofcv.alg.geo.DecomposeEssential;
 import boofcv.alg.geo.MultiViewOps;
+import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.alg.geo.robust.Se3FromEssentialGenerator;
 import boofcv.alg.geo.robust.SelectBestStereoTransform;
+import boofcv.factory.distort.LensDistortionFactory;
 import boofcv.factory.geo.*;
+import boofcv.gui.feature.AssociationPanel;
+import boofcv.gui.image.ShowImages;
+import boofcv.struct.calib.CameraPinhole;
+import boofcv.struct.calib.CameraPinholeBrown;
+import boofcv.struct.distort.Point2Transform2_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.geo.GeoModelEstimator1;
 import georegression.struct.se.Se3_F64;
@@ -15,6 +22,7 @@ import org.ejml.data.DMatrixRMaj;
 import org.ejml.dense.row.CommonOps_DDRM;
 import org.ejml.ops.CommonOps_BDRM;
 
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,7 +30,7 @@ import java.util.List;
 
 public class pose {
     public static Se3_F64 init(List<Track> tracks, List<Camera> cameras, Config config){
-        Se3_F64 model = new Se3_F64();
+//        Se3_F64 model = new Se3_F64();
 
         // Method 1
         List<AssociatedPair> matches = new ArrayList<>();
@@ -32,77 +40,69 @@ public class pose {
             cameras.get(track.camids.get(1)).kps.get(track.kpids.get(1)).print();
             matches.add(p);
         }
-
+        CameraPinholeBrown intrinsic = new CameraPinholeBrown();
+        intrinsic.fsetK(config.K);
+        List<AssociatedPair> matchedCalibrated = convertToNormalizedCoordinates(matches, intrinsic);
         List<AssociatedPair> inliers = new ArrayList<>();
-        DMatrixRMaj F = robustFundamental(matches, inliers, config);
-        DMatrixRMaj E = fund2essential(F, config.K, config.K.copy());
-        //List<Se3_F64> poses = MultiViewOps.decomposeEssential(E);
-        E.print();
-
-        // Method 2
-        DMatrixRMaj Kinv = config.K.copy();
-
-        /*
-        DecomposeEssential decomposeE = new DecomposeEssential();
-        Triangulate2ViewsMetric triangulate;
-        SelectBestStereoTransform selectBest = new SelectBestStereoTransform(triangulate);
-        decomposeE.decompose(E);
-        List<Se3_F64> poses = decomposeE.getSolutions();
-        selectBest.select(decomposeE.getSolutions(),inliers,model);
-        */
-
-        /*
-        Estimate1ofEpipolar essentialAlg = FactoryMultiView.fundamental_1(EnumFundamental.LINEAR_8, 0);
-        Triangulate2ViewsMetricH triangulate = FactoryMultiView.triangulate2ViewMetricH(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
-        Se3FromEssentialGenerator alg = new Se3FromEssentialGenerator(essentialAlg, triangulate);
-
-        alg.generate(matches, model);
-        pose.R.print();
-        */
-        config.init = true;
-        return model;
+        Se3_F64 pose = estimateCameraMotion(intrinsic, matchedCalibrated, inliers);
+        System.out.println(pose);
+//        drawInliers(cameras.get(1).img, cameras.get(0).img, intrinsic, inliers);
+        return pose;
     }
-    public static DMatrixRMaj fund2essential(DMatrixRMaj F, DMatrixRMaj K1, DMatrixRMaj K2){
-        CommonOps_DDRM.transpose(K1);
-        DMatrixRMaj Et = F.copy();
-        DMatrixRMaj E = Et.copy();
-        CommonOps_DDRM.mult(K1, F, Et);
-        CommonOps_DDRM.mult(Et, K2, E);
-        return E;
+    public static Se3_F64 estimateCameraMotion( CameraPinholeBrown intrinsic,
+                                                List<AssociatedPair> matchedNorm, List<AssociatedPair> inliers ) {
+        ModelMatcherMultiview<Se3_F64, AssociatedPair> epipolarMotion =
+                FactoryMultiViewRobust.baselineRansac(new ConfigEssential(), new ConfigRansac(200, 0.5));
+        epipolarMotion.setIntrinsic(0, intrinsic);
+        epipolarMotion.setIntrinsic(1, intrinsic);
+
+        if (!epipolarMotion.process(matchedNorm))
+            throw new RuntimeException("Motion estimation failed");
+
+        // save inlier set for debugging purposes
+        inliers.addAll(epipolarMotion.getMatchSet());
+
+        return epipolarMotion.getModelParameters();
     }
-    public static DMatrixRMaj robustFundamental(List<AssociatedPair> matches, List<AssociatedPair> inliers, Config config) {
-        // Estimate the fundamental matrix while removing outliers
-        if (!config.funRansac.process(matches))
-            throw new IllegalArgumentException("Failed");
+    public static List<AssociatedPair> convertToNormalizedCoordinates( List<AssociatedPair> matchedFeatures, CameraPinholeBrown intrinsic ) {
 
-        // save the set of features that were used to compute the fundamental matrix
-        inliers.addAll(config.funRansac.getMatchSet());
+        Point2Transform2_F64 p_to_n = LensDistortionFactory.narrow(intrinsic).undistort_F64(true, false);
 
-        // Improve the estimate of the fundamental matrix using non-linear optimization
-        var F = new DMatrixRMaj(3, 3);
-        if (!config.refine.fitModel(inliers, config.funRansac.getModelParameters(), F))
-            throw new IllegalArgumentException("Failed");
+        List<AssociatedPair> calibratedFeatures = new ArrayList<>();
 
-        MultiViewOps.decomposeEssential(F);
-        // Return the solution
-        return F;
+        for (AssociatedPair p : matchedFeatures) {
+            AssociatedPair c = new AssociatedPair();
+
+            p_to_n.compute(p.p1.x, p.p1.y, c.p1);
+            p_to_n.compute(p.p2.x, p.p2.y, c.p2);
+
+            calibratedFeatures.add(c);
+        }
+
+        return calibratedFeatures;
+    }
+    public static void drawInliers(BufferedImage left, BufferedImage right, CameraPinholeBrown intrinsic,
+                                   List<AssociatedPair> normalized ) {
+        Point2Transform2_F64 n_to_p = LensDistortionFactory.narrow(intrinsic).distort_F64(false, true);
+
+        List<AssociatedPair> pixels = new ArrayList<>();
+
+        for (AssociatedPair n : normalized) {
+            AssociatedPair p = new AssociatedPair();
+
+            n_to_p.compute(n.p1.x, n.p1.y, p.p1);
+            n_to_p.compute(n.p2.x, n.p2.y, p.p2);
+
+            pixels.add(p);
+        }
+
+        // display the results
+        AssociationPanel panel = new AssociationPanel(20);
+        panel.setAssociation(pixels);
+        panel.setImages(left, right);
+
+        ShowImages.showWindow(panel, "Inlier Features", true);
     }
 
-    public static DMatrixRMaj robustEssential(List<AssociatedPair> matches, List<AssociatedPair> inliers, Config config) {
-        // Estimate the essential matrix while removing outliers
-        if (!config.essRansac.process(matches))
-            throw new IllegalArgumentException("Failed");
 
-        // save the set of features that were used to compute the fundamental matrix
-        inliers.addAll(config.essRansac.getMatchSet());
-
-        // Improve the estimate of the fundamental matrix using non-linear optimization
-        var F = new DMatrixRMaj(3, 3);
-        if (!config.refine.fitModel(inliers, config.essRansac.getModelParameters(), F))
-            throw new IllegalArgumentException("Failed");
-
-        MultiViewOps.decomposeEssential(F);
-        // Return the solution
-        return F;
-    }
 }

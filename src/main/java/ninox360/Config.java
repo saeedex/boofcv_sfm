@@ -5,11 +5,11 @@ import boofcv.abst.feature.associate.ScoreAssociation;
 import boofcv.abst.feature.detdesc.DetectDescribePoint;
 import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
+import boofcv.alg.geo.PerspectiveOps;
 import boofcv.factory.feature.associate.ConfigAssociateGreedy;
 import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
 import boofcv.factory.geo.*;
-import boofcv.struct.calib.CameraPinhole;
 import boofcv.struct.calib.CameraPinholeBrown;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
@@ -26,6 +26,7 @@ public class Config {
     ModelMatcher<DMatrixRMaj, AssociatedPair> funRansac;
     ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
     ModelFitter<DMatrixRMaj, AssociatedPair> refine;
+    CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
     boolean init = false;
 
@@ -59,18 +60,10 @@ public class Config {
         this.refine = FactoryMultiView.fundamentalRefine(1e-8, 400, EpipolarError.SAMPSON);
     }
 
-    public void getintrinsic(BufferedImage sample){
-
+    public void setintrinsic(BufferedImage sample){
         int height = sample.getHeight();
         int width = sample.getWidth();
-        CameraPinhole p = new CameraPinhole(width/2, width/2, 0, 0, 0, width, height);
-        DMatrixRMaj K = new DMatrixRMaj(3,3);
-
-        K.set(2,2, 1.0);
-        K.set(0,0,p.fx);
-        K.set(1,1,p.fy);
-        K.set(0,2,p.cx);
-        K.set(1,2,p.cy);
-        this.K = K;
+        this.intrinsic = new CameraPinholeBrown(height, height, 0, width/2, height/2, width, height);
+        this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
     }
 }

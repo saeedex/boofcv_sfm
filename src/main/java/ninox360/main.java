@@ -30,8 +30,8 @@ public class main {
 
         // Config
         Config config = new Config(1000, 0.1, 0.8);
-        config.getintrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
-
+        config.setintrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
+        config.getK(config.intrinsic);
         for (String imageFile : imageFiles){
             // load images
             BufferedImage img = UtilImageIO.loadImageNotNull(imageFile);

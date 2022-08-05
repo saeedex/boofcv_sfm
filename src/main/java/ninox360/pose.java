@@ -4,6 +4,7 @@ import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.abst.geo.Triangulate2ViewsMetricH;
 import boofcv.alg.geo.DecomposeEssential;
 import boofcv.alg.geo.MultiViewOps;
+import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.alg.geo.robust.Se3FromEssentialGenerator;
 import boofcv.alg.geo.robust.SelectBestStereoTransform;
 import boofcv.factory.geo.*;
@@ -23,42 +24,18 @@ import java.util.List;
 public class pose {
     public static Se3_F64 init(List<Track> tracks, List<Camera> cameras, Config config){
         Se3_F64 model = new Se3_F64();
-
-        // Method 1
         List<AssociatedPair> matches = new ArrayList<>();
         for (Track track : tracks) {
             var p = new AssociatedPair(cameras.get(track.camids.get(0)).kps.get(track.kpids.get(0)),
                     cameras.get(track.camids.get(1)).kps.get(track.kpids.get(1)));
-            cameras.get(track.camids.get(1)).kps.get(track.kpids.get(1)).print();
             matches.add(p);
         }
 
-        List<AssociatedPair> inliers = new ArrayList<>();
-        DMatrixRMaj F = robustFundamental(matches, inliers, config);
-        DMatrixRMaj E = fund2essential(F, config.K, config.K.copy());
-        //List<Se3_F64> poses = MultiViewOps.decomposeEssential(E);
-        E.print();
-
-        // Method 2
-        DMatrixRMaj Kinv = config.K.copy();
-
-        /*
-        DecomposeEssential decomposeE = new DecomposeEssential();
-        Triangulate2ViewsMetric triangulate;
-        SelectBestStereoTransform selectBest = new SelectBestStereoTransform(triangulate);
-        decomposeE.decompose(E);
-        List<Se3_F64> poses = decomposeE.getSolutions();
-        selectBest.select(decomposeE.getSolutions(),inliers,model);
-        */
-
-        /*
         Estimate1ofEpipolar essentialAlg = FactoryMultiView.fundamental_1(EnumFundamental.LINEAR_8, 0);
         Triangulate2ViewsMetricH triangulate = FactoryMultiView.triangulate2ViewMetricH(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
         Se3FromEssentialGenerator alg = new Se3FromEssentialGenerator(essentialAlg, triangulate);
-
         alg.generate(matches, model);
-        pose.R.print();
-        */
+
         config.init = true;
         return model;
     }

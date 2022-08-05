@@ -7,7 +7,10 @@ import boofcv.alg.geo.MultiViewOps;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.alg.geo.robust.Se3FromEssentialGenerator;
 import boofcv.alg.geo.robust.SelectBestStereoTransform;
+import boofcv.factory.distort.LensDistortionFactory;
 import boofcv.factory.geo.*;
+import boofcv.struct.calib.CameraPinholeBrown;
+import boofcv.struct.distort.Point2Transform2_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.geo.GeoModelEstimator1;
 import georegression.struct.se.Se3_F64;
@@ -23,7 +26,6 @@ import java.util.List;
 
 public class pose {
     public static Se3_F64 init(List<Track> tracks, List<Camera> cameras, Config config){
-        Se3_F64 model = new Se3_F64();
         List<AssociatedPair> matches = new ArrayList<>();
         for (Track track : tracks) {
             var p = new AssociatedPair(cameras.get(track.camids.get(0)).kps.get(track.kpids.get(0)),
@@ -31,13 +33,44 @@ public class pose {
             matches.add(p);
         }
 
-        Estimate1ofEpipolar essentialAlg = FactoryMultiView.fundamental_1(EnumFundamental.LINEAR_8, 0);
-        Triangulate2ViewsMetricH triangulate = FactoryMultiView.triangulate2ViewMetricH(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
-        Se3FromEssentialGenerator alg = new Se3FromEssentialGenerator(essentialAlg, triangulate);
-        alg.generate(matches, model);
-
+        List<AssociatedPair> matchedCalibrated = convertToNormalizedCoordinates(matches, config.intrinsic);
+        List<AssociatedPair> inliers = new ArrayList<>();
+        Se3_F64 pose = estimateCameraMotion(config.intrinsic, matchedCalibrated, inliers);
+        System.out.println(pose);
         config.init = true;
-        return model;
+        return pose;
+    }
+    public static Se3_F64 estimateCameraMotion( CameraPinholeBrown intrinsic,
+                                                List<AssociatedPair> matchedNorm, List<AssociatedPair> inliers ) {
+        ModelMatcherMultiview<Se3_F64, AssociatedPair> epipolarMotion =
+                FactoryMultiViewRobust.baselineRansac(new ConfigEssential(), new ConfigRansac(200, 0.5));
+        epipolarMotion.setIntrinsic(0, intrinsic);
+        epipolarMotion.setIntrinsic(1, intrinsic);
+
+        if (!epipolarMotion.process(matchedNorm))
+            throw new RuntimeException("Motion estimation failed");
+
+        // save inlier set for debugging purposes
+        inliers.addAll(epipolarMotion.getMatchSet());
+
+        return epipolarMotion.getModelParameters();
+    }
+    public static List<AssociatedPair> convertToNormalizedCoordinates( List<AssociatedPair> matchedFeatures, CameraPinholeBrown intrinsic ) {
+
+        Point2Transform2_F64 p_to_n = LensDistortionFactory.narrow(intrinsic).undistort_F64(true, false);
+
+        List<AssociatedPair> calibratedFeatures = new ArrayList<>();
+
+        for (AssociatedPair p : matchedFeatures) {
+            AssociatedPair c = new AssociatedPair();
+
+            p_to_n.compute(p.p1.x, p.p1.y, c.p1);
+            p_to_n.compute(p.p2.x, p.p2.y, c.p2);
+
+            calibratedFeatures.add(c);
+        }
+
+        return calibratedFeatures;
     }
     public static DMatrixRMaj fund2essential(DMatrixRMaj F, DMatrixRMaj K1, DMatrixRMaj K2){
         CommonOps_DDRM.transpose(K1);

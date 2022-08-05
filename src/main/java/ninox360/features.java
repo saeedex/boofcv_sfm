@@ -1,14 +1,6 @@
 package ninox360;
 
-import boofcv.abst.feature.associate.AssociateDescription;
-import boofcv.abst.feature.associate.ScoreAssociation;
-import boofcv.abst.feature.detdesc.DetectDescribePoint;
-import boofcv.abst.feature.detect.extract.ConfigExtract;
-import boofcv.abst.feature.detect.interest.ConfigFastHessian;
 import boofcv.alg.descriptor.UtilFeature;
-import boofcv.factory.feature.associate.ConfigAssociateGreedy;
-import boofcv.factory.feature.associate.FactoryAssociation;
-import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
 import boofcv.struct.feature.AssociatedIndex;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.image.GrayF32;

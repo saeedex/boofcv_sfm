@@ -3,6 +3,7 @@ package ninox360;
 import boofcv.gui.feature.VisualizeFeatures;
 import boofcv.struct.feature.TupleDesc_F64;
 import georegression.struct.point.Point2D_F64;
+import georegression.struct.point.Point3D_F64;
 import org.ddogleg.struct.DogArray;
 
 import java.awt.*;

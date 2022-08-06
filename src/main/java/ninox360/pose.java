@@ -30,6 +30,7 @@ import org.ejml.dense.row.CommonOps_DDRM;
 import org.ejml.ops.CommonOps_BDRM;
 
 import java.awt.*;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -39,7 +40,7 @@ import java.util.List;
 
 
 public class pose {
-    public static void init(List<Track> tracks, List<Camera> cameras, Config config){
+    public static void init(List<Track> tracks, List<Camera> cameras, Config config) throws IOException {
         List<AssociatedPair> matches = new ArrayList<>();
         for (Track track : tracks) {
             var p = new AssociatedPair(cameras.get(track.camids.get(0)).kps.get(track.kpids.get(0)),
@@ -51,6 +52,33 @@ public class pose {
         Se3_F64 mot = estimateCameraMotion(config.intrinsic, matchesNorm, inliers, config);
         config.init = true;
         cameras.get(1).setpose(mot);
+
+        //testing track.triangulate
+        List<Point3D_F64> points = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        for (Track track: tracks){
+            if (!track.valid) {
+                track.triangulate(cameras, config);
+                if (track.valid) {
+                    points.add(track.str);
+                    colors.add(255);
+                }
+            }
+        }
+        System.out.println(points.size());
+        PointCloudViewer viewer = VisualizeData.createPointCloudViewer();
+        viewer.setFog(true);
+        viewer.setColorizer(new TwoAxisRgbPlane.Z_XY(1.0).fperiod(40));
+        viewer.setDotSize(1);
+        //viewer.setTranslationStep(0.15);
+        viewer.addCloud(( idx, p ) -> p.setTo(points.get(idx)), colors::get, colors.size());
+        viewer.setCameraHFov(UtilAngle.radian(60));
+        viewer.getComponent().setPreferredSize(new Dimension(600, 600));
+        ShowImages.showWindow(viewer.getComponent(), "Refined Scene", true);
+        var copy = new DogArray<>(Point3dRgbI_F64::new);
+        viewer.copyCloud(copy);
+        OutputStream out = new FileOutputStream("saved_cloud.ply");
+        PointCloudIO.save3D(PointCloudIO.Format.PLY, PointCloudReader.wrapF64RGB(copy.toList()), true, out);
     }
     public static Se3_F64 estimateCameraMotion(CameraPinholeBrown intrinsic, List<AssociatedPair> matchedNorm, List<AssociatedPair> inliers, Config config) {
         config.epiMotion.setIntrinsic(0, intrinsic);
@@ -65,17 +93,13 @@ public class pose {
         return config.epiMotion.getModelParameters();
     }
     public static List<AssociatedPair> convertToNormalizedCoordinates( List<AssociatedPair> matchedFeatures, CameraPinholeBrown intrinsic ) {
-
         Point2Transform2_F64 p_to_n = LensDistortionFactory.narrow(intrinsic).undistort_F64(true, false);
-
         List<AssociatedPair> calibratedFeatures = new ArrayList<>();
 
         for (AssociatedPair p : matchedFeatures) {
             AssociatedPair c = new AssociatedPair();
-
             p_to_n.compute(p.p1.x, p.p1.y, c.p1);
             p_to_n.compute(p.p2.x, p.p2.y, c.p2);
-
             calibratedFeatures.add(c);
         }
 

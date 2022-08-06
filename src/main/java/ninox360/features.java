@@ -35,7 +35,7 @@ public class features {
     public static feat detect(GrayF32 image, Config config){
         // specify the image to process
         config.describer.detect(image);
-        System.out.println("Found Features: "+config.describer.getNumberOfFeatures());
+        //System.out.println("Found Features: "+config.describer.getNumberOfFeatures());
 
         // store output
         List<Point2D_F64> points = new ArrayList<>();

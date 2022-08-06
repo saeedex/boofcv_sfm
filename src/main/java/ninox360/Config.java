@@ -8,11 +8,13 @@ import boofcv.abst.feature.detect.interest.ConfigFastHessian;
 import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
+import boofcv.factory.distort.LensDistortionFactory;
 import boofcv.factory.feature.associate.ConfigAssociateGreedy;
 import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
 import boofcv.factory.geo.*;
 import boofcv.struct.calib.CameraPinholeBrown;
+import boofcv.struct.distort.Point2Transform2_F64;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.image.GrayF32;
@@ -36,6 +38,7 @@ public class Config {
     Triangulate2ViewsMetric trian;
     CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
+    Point2Transform2_F64 norm;
     boolean init = false;
 
     public Config(int numFeatures, double matcherThreshold, double inlierThreshold){
@@ -66,7 +69,6 @@ public class Config {
 
         // triangulation
         this.trian = FactoryMultiView.triangulate2ViewMetric(new ConfigTriangulation());
-
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
         this.funRansac = FactoryMultiViewRobust.fundamentalRansac(configFundamental, configRansac);
         this.essRansac = FactoryMultiViewRobust.essentialRansac(configEssential, configRansac);
@@ -78,5 +80,6 @@ public class Config {
         int width = sample.getWidth();
         this.intrinsic = new CameraPinholeBrown(height, height, 0, width/2, height/2, width, height);
         this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
+        this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
     }
 }

@@ -50,7 +50,6 @@ public class main {
 
                 if (!config.init) {
                     pose.init(tracks, cameras, config);
-                    Track.triangulate(tracks, cameras, config);
                 }
 
             }

@@ -2,6 +2,7 @@ package ninox360;
 import boofcv.abst.geo.Estimate1ofEpipolar;
 import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.abst.geo.Triangulate2ViewsMetricH;
+import boofcv.alg.cloud.PointCloudReader;
 import boofcv.alg.geo.DecomposeEssential;
 import boofcv.alg.geo.MultiViewOps;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
@@ -9,36 +10,47 @@ import boofcv.alg.geo.robust.Se3FromEssentialGenerator;
 import boofcv.alg.geo.robust.SelectBestStereoTransform;
 import boofcv.factory.distort.LensDistortionFactory;
 import boofcv.factory.geo.*;
+import boofcv.gui.image.ShowImages;
+import boofcv.io.points.PointCloudIO;
+import boofcv.struct.Point3dRgbI_F64;
 import boofcv.struct.calib.CameraPinholeBrown;
 import boofcv.struct.distort.Point2Transform2_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.geo.GeoModelEstimator1;
+import boofcv.visualize.PointCloudViewer;
+import boofcv.visualize.TwoAxisRgbPlane;
+import boofcv.visualize.VisualizeData;
+import georegression.metric.UtilAngle;
+import georegression.struct.point.Point3D_F64;
 import georegression.struct.se.Se3_F64;
 import org.ddogleg.fitting.modelset.ModelGenerator;
+import org.ddogleg.struct.DogArray;
 import org.ejml.data.DMatrixRMaj;
 import org.ejml.dense.row.CommonOps_DDRM;
 import org.ejml.ops.CommonOps_BDRM;
 
+import java.awt.*;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 
 
 public class pose {
-    public static Se3_F64 init(List<Track> tracks, List<Camera> cameras, Config config){
+    public static void init(List<Track> tracks, List<Camera> cameras, Config config){
         List<AssociatedPair> matches = new ArrayList<>();
         for (Track track : tracks) {
             var p = new AssociatedPair(cameras.get(track.camids.get(0)).kps.get(track.kpids.get(0)),
                     cameras.get(track.camids.get(1)).kps.get(track.kpids.get(1)));
             matches.add(p);
         }
-
-        List<AssociatedPair> matchedCalibrated = convertToNormalizedCoordinates(matches, config.intrinsic);
+        List<AssociatedPair> matchesNorm = convertToNormalizedCoordinates(matches, config.intrinsic);
         List<AssociatedPair> inliers = new ArrayList<>();
-        Se3_F64 pose = estimateCameraMotion(config.intrinsic, matchedCalibrated, inliers, config);
-        System.out.println(pose);
+        Se3_F64 mot = estimateCameraMotion(config.intrinsic, matchesNorm, inliers, config);
         config.init = true;
-        return pose;
+        cameras.get(1).setpose(mot);
     }
     public static Se3_F64 estimateCameraMotion(CameraPinholeBrown intrinsic, List<AssociatedPair> matchedNorm, List<AssociatedPair> inliers, Config config) {
         config.epiMotion.setIntrinsic(0, intrinsic);

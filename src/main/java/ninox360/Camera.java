@@ -4,6 +4,7 @@ import boofcv.gui.feature.VisualizeFeatures;
 import boofcv.struct.feature.TupleDesc_F64;
 import georegression.struct.point.Point2D_F64;
 import georegression.struct.point.Point3D_F64;
+import georegression.struct.se.Se3_F64;
 import org.ddogleg.struct.DogArray;
 
 import java.awt.*;
@@ -17,6 +18,7 @@ public class Camera {
     List<Point2D_F64> kps;
     DogArray<TupleDesc_F64> dscs;
     List<Integer> trackids;
+    Se3_F64 pose;
 
     public Camera(int id, String file, BufferedImage img, List<Point2D_F64> kps, DogArray<TupleDesc_F64> dscs, List<Integer> trackids){
         this.id = id;
@@ -41,5 +43,9 @@ public class Camera {
                 VisualizeFeatures.drawPoint(vimg, this.kps.get(i).x, this.kps.get(i).y, 2, Color.BLUE, false);
             }
         }
+    }
+
+    public void setpose(Se3_F64 pose){
+        this.pose = pose;
     }
 }

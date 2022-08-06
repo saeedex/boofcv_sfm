@@ -5,6 +5,7 @@ import boofcv.abst.feature.associate.ScoreAssociation;
 import boofcv.abst.feature.detdesc.DetectDescribePoint;
 import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
+import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.factory.feature.associate.ConfigAssociateGreedy;
@@ -32,6 +33,7 @@ public class Config {
     ModelMatcher<DMatrixRMaj, AssociatedPair> funRansac;
     ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
     ModelFitter<DMatrixRMaj, AssociatedPair> refine;
+    Triangulate2ViewsMetric trian;
     CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
     boolean init = false;
@@ -51,6 +53,7 @@ public class Config {
         configRansac.inlierThreshold = inlierThreshold;
         configRansac.iterations = 1000;
 
+        // motion
         ConfigFundamental configFundamental = new ConfigFundamental();
         configFundamental.which = EnumFundamental.LINEAR_8;
         configFundamental.numResolve = 2;
@@ -60,6 +63,9 @@ public class Config {
         configEssential.which = EnumEssential.LINEAR_8;
         configEssential.numResolve = 2;
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
+
+        // triangulation
+        this.trian = FactoryMultiView.triangulate2ViewMetric(new ConfigTriangulation());
 
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
         this.funRansac = FactoryMultiViewRobust.fundamentalRansac(configFundamental, configRansac);

@@ -12,6 +12,7 @@ import org.ddogleg.struct.FastAccess;
 import org.ejml.data.DMatrixRMaj;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,22 +21,20 @@ import java.util.List;
  *
  */
 public class main {
-    public static void main(String[] args) {
-        String imageDirectory = "../dataset/";
+    public static void main(String[] args) throws IOException {
+        String imageDirectory = "../dataset/03/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<Camera> cameras = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
         var gui = new ListDisplayPanel();
-        Se3_F64 kpose;
 
         // Config
-        Config config = new Config(1000, 0.1, 0.8);
+        Config config = new Config(1000, 0.2, 0.5);
         config.setintrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
 
         for (String imageFile : imageFiles){
             // load images
             BufferedImage img = UtilImageIO.loadImageNotNull(imageFile);
-
             // detect features
             feat cfeat = features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config);
             Camera camera = new Camera(cameras.size(), imageFile, img, cfeat.getkps(), cfeat.getdscs(), cfeat.gettrackids());
@@ -49,8 +48,10 @@ public class main {
                 // mapping
                 features.map(tracks, cameras, idxpair);
 
-                if (!config.init)
-                    kpose = pose.init(tracks, cameras, config);
+                if (!config.init) {
+                    pose.init(tracks, cameras, config);
+                    Track.triangulate(tracks, cameras, config);
+                }
 
             }
         }

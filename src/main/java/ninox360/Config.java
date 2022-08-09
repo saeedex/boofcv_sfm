@@ -5,23 +5,36 @@ import boofcv.abst.feature.associate.ScoreAssociation;
 import boofcv.abst.feature.detdesc.DetectDescribePoint;
 import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
+import boofcv.abst.geo.Estimate1ofPnP;
+import boofcv.abst.geo.RefinePnP;
 import boofcv.abst.geo.Triangulate2ViewsMetric;
+import boofcv.abst.geo.TriangulateNViewsMetric;
 import boofcv.alg.geo.PerspectiveOps;
+import boofcv.alg.geo.WorldToCameraToPixel;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.factory.distort.LensDistortionFactory;
 import boofcv.factory.feature.associate.ConfigAssociateGreedy;
 import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
 import boofcv.factory.geo.*;
+import boofcv.gui.ListDisplayPanel;
+import boofcv.misc.ConfigConverge;
 import boofcv.struct.calib.CameraPinholeBrown;
 import boofcv.struct.distort.Point2Transform2_F64;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
+import boofcv.struct.geo.Point2D3D;
 import boofcv.struct.image.GrayF32;
+import boofcv.visualize.PointCloudViewer;
+import boofcv.visualize.TwoAxisRgbPlane;
+import boofcv.visualize.VisualizeData;
+import georegression.metric.UtilAngle;
 import georegression.struct.se.Se3_F64;
 import org.ddogleg.fitting.modelset.ModelFitter;
 import org.ddogleg.fitting.modelset.ModelMatcher;
 import org.ejml.data.DMatrixRMaj;
+
+import java.awt.*;
 import java.awt.image.BufferedImage;
 
 public class Config {
@@ -32,14 +45,21 @@ public class Config {
     ConfigRansac ransac;
     ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
 
+    ModelMatcherMultiview<Se3_F64, Point2D3D> estimatePnP;
+
+    RefinePnP refinePnP;
+
     ModelMatcher<DMatrixRMaj, AssociatedPair> funRansac;
     ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
     ModelFitter<DMatrixRMaj, AssociatedPair> refine;
-    Triangulate2ViewsMetric trian;
+    TriangulateNViewsMetric trian;
     CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
     Point2Transform2_F64 norm;
     boolean init = false;
+
+    PointCloudViewer viewer;
+    ListDisplayPanel gui;
 
     public Config(int numFeatures, double matcherThreshold, double inlierThreshold){
         // describer and matcher
@@ -57,29 +77,35 @@ public class Config {
         configRansac.iterations = 1000;
 
         // motion
-        ConfigFundamental configFundamental = new ConfigFundamental();
-        configFundamental.which = EnumFundamental.LINEAR_8;
-        configFundamental.numResolve = 2;
-        configFundamental.errorModel = ConfigFundamental.ErrorModel.GEOMETRIC;
-
         ConfigEssential configEssential = new ConfigEssential();
         configEssential.which = EnumEssential.LINEAR_8;
         configEssential.numResolve = 2;
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
 
-        // triangulation
-        this.trian = FactoryMultiView.triangulate2ViewMetric(new ConfigTriangulation());
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
-        this.funRansac = FactoryMultiViewRobust.fundamentalRansac(configFundamental, configRansac);
-        this.essRansac = FactoryMultiViewRobust.essentialRansac(configEssential, configRansac);
-        this.refine = FactoryMultiView.fundamentalRefine(1e-8, 400, EpipolarError.SAMPSON);
+        this.estimatePnP = FactoryMultiViewRobust.pnpRansac(new ConfigPnP(), configRansac);
+        this.refinePnP = FactoryMultiView.pnpRefine(1e-12,40);
+
+        // triangulation
+        // ConfigTriangulation.Type.GEOMETRIC resulted in better triangulation accuracy
+        this.trian = FactoryMultiView.triangulateNViewMetric(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
+
+        // Viewer
+        this.viewer = VisualizeData.createPointCloudViewer();
+        this.viewer.setCameraHFov(UtilAngle.radian(60));
+        this.viewer.getComponent().setPreferredSize(new Dimension(600, 600));
+        this.viewer.setFog(true);
+        this.viewer.setColorizer(new TwoAxisRgbPlane.Z_XY(1.0).fperiod(40));
+        this.viewer.setDotSize(1);
+        this.gui = new ListDisplayPanel();
     }
 
-    public void setintrinsic(BufferedImage sample){
+    public void getIntrinsic(BufferedImage sample){
         int height = sample.getHeight();
         int width = sample.getWidth();
         this.intrinsic = new CameraPinholeBrown(height, height, 0, width/2, height/2, width, height);
         this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
         this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
     }
+
 }

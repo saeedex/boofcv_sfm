@@ -68,31 +68,12 @@ public class main {
             }
 
             // triangulate newly created tracks
-            views.get(id).triangulation(tracks, views, config);
+            views.get(id).triangulateTracks(structure, tracks, views, config);
         }
 
         // Visualize
-        for (View view : views){
-            view.projectTracks(tracks, config);
-            view.viewTracks();
-            view.viewProjections();
-            config.gui.addImage(view.img, view.file);
-        }
-        ShowImages.showWindow(config.gui,"detected features", true);
-
-        // tracks
-        int cnt = 0;
-        for (Track track: tracks){
-            if (track.valid) {
-                config.viewer.addPoint(track.str.getX(), track.str.getY(), track.str.getZ(), 255);
-                structure.points.grow();
-                structure.setPoint(cnt, track.str.x, track.str.y, track.str.z);
-                for (int camid:track.camids){
-                    structure.connectPointToView(cnt, camid);
-                }
-                cnt += 1;
-            }
-        }
+        View.viewViews(tracks, views, config);
+        Track.addCloud2viewer(tracks, config);
 
         SwingUtilities.invokeLater(() -> {
             BoofSwingUtil.visualizeCameras(structure, config.viewer);

@@ -24,51 +24,27 @@ import static java.lang.Math.sqrt;
 public class Track {
     int id;
     int length;
-    List<Integer> camids;
+    List<Integer> viewIds;
     List<Integer> kpids;
     Point3D_F64 str = new Point3D_F64();
     boolean valid = false;
 
-    public Track(int id, int length, List<Integer> camids, List<Integer> kpids){
+    public Track(int id, int length, List<Integer> viewIds, List<Integer> kpids){
         this.id = id;
-        this.camids = camids;
+        this.viewIds = viewIds;
         this.kpids = kpids;
         this.length = length;
     }
 
     /**
-     * triangulates a track. Initial version uses last two observations assumes
-     * that only new tracks are being triangulated
-     * based on baseline, cheirality and geometric error.
-     */
-    /*
-    public void triangulate(List<Camera> cameras, Config config){
-        Point3D_F64 mcampt = new Point3D_F64();
-        Point3D_F64 pt = new Point3D_F64();
-        int mid = this.length - 2;
-        int id = this.length - 1;
-        int mcamid = this.camids.get(mid);
-        int camid = this.camids.get(id);
-        AssociatedPair match = new AssociatedPair(cameras.get(mcamid).obs.get(this.kpids.get(mid)),
-                cameras.get(camid).obs.get(this.kpids.get(id)));
-
-        Se3_F64 motionBtoWorld = cameras.get(mcamid).pose.invert(null);
-        if (config.trian.triangulate(match.p1, match.p2, cameras.get(camid).conns.get(0).getmotion(), mcampt)) {
-            if (mcampt.z > 0) {
-                SePointOps_F64.transform(motionBtoWorld, mcampt, pt);
-                this.str = mcampt;
-                this.valid = true;
-            }
-        }
-    }
-
+     * triangulates a track.
      */
     public void triangulateN(List<View> views, Config config){
         Point3D_F64 pt = new Point3D_F64();
         List<Point2D_F64> matches = new ArrayList<>();
         List<Se3_F64> poses = new ArrayList<>();
-        for (int i = 0; i < this.camids.size(); i++) {
-            View view = views.get(this.camids.get(i));
+        for (int i = 0; i < this.viewIds.size(); i++) {
+            View view = views.get(this.viewIds.get(i));
             matches.add(view.obs.get(this.kpids.get(i)));
             poses.add(view.pose);
         }
@@ -81,15 +57,15 @@ public class Track {
                 double diffx;
                 double diffy;
                 double res = 0;
-                for (int i = 0; i < this.camids.size(); i++) {
-                    View view = views.get(this.camids.get(i));
+                for (int i = 0; i < this.viewIds.size(); i++) {
+                    View view = views.get(this.viewIds.get(i));
                     Point2D_F64 prj = this.project(view, config);
 
                     diffx = (prj.x - view.kps.get(this.kpids.get(i)).x);
                     diffy = (prj.y - view.kps.get(this.kpids.get(i)).y);
                     res += sqrt(diffx*diffx + diffy*diffy);
                 }
-                res = res/this.camids.size();
+                res = res/this.viewIds.size();
                 if(res > 1.0) this.valid = false;
             }
         }
@@ -111,5 +87,13 @@ public class Track {
         cloud.toArray(new Point3dRgbI_F64[0]);
         OutputStream out = new FileOutputStream("saved_cloud.ply");
         PointCloudIO.save3D(PointCloudIO.Format.PLY, PointCloudReader.wrapF64RGB(cloud), true, out);
+    }
+
+    public static void addCloud2viewer(List<Track> tracks, Config config){
+        for (Track track: tracks){
+            if (track.valid) {
+                config.viewer.addPoint(track.str.getX(), track.str.getY(), track.str.getZ(), 255);
+            }
+        }
     }
 }

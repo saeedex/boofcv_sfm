@@ -2,6 +2,7 @@ package ninox360;
 
 import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.gui.feature.VisualizeFeatures;
+import boofcv.gui.image.ShowImages;
 import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
 import boofcv.struct.feature.AssociatedIndex;
@@ -90,7 +91,7 @@ public class View {
                 }
 
                 // Update existing tracks
-                tracks.get(mtrkId).camids.add(this.id);
+                tracks.get(mtrkId).viewIds.add(this.id);
                 tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
                 tracks.get(mtrkId).length += 1;
                 this.trackIds.set(idxPair.get(i).src, mtrkId);
@@ -169,9 +170,18 @@ public class View {
         structure.setView(id, 0, true, views.get(id).conns.get(0).getMotion(), mid);
     }
 
-    public void triangulation(List<Track> tracks, List<View> views, Config config){
+    public void triangulateTracks(SceneStructureMetric structure, List<Track> tracks, List<View> views, Config config){
         for (Track track: tracks){
-            if (!track.valid) track.triangulateN(views, config);
+            if (!track.valid) {
+                track.triangulateN(views, config);
+                if (track.valid){
+                    structure.points.grow();
+                    structure.setPoint(structure.points.size-1, track.str.x, track.str.y, track.str.z);
+                    for (int viewId:track.viewIds){
+                        structure.connectPointToView(structure.points.size-1, viewId);
+                    }
+                }
+            }
         }
     }
     public void projectTracks(List<Track> tracks, Config config){
@@ -197,5 +207,15 @@ public class View {
         for (Point2D_F64 point2D_f64 : this.prj) {
             VisualizeFeatures.drawPoint(vImg, point2D_f64.x, point2D_f64.y, 2, Color.RED, false);
         }
+    }
+
+    public static void viewViews(List<Track> tracks, List<View> views, Config config){
+        for (View view : views){
+            view.projectTracks(tracks, config);
+            view.viewTracks();
+            view.viewProjections();
+            config.gui.addImage(view.img, view.file);
+        }
+        ShowImages.showWindow(config.gui,"detected features", true);
     }
 }

@@ -51,69 +51,33 @@ public class main {
         List<View> views = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
 
-        Config config = new Config(1000, 0.1, 0.5);
+        Config config = new Config(500, 0.1, 0.8);
         config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
-
-        SceneStructureMetric structure = new SceneStructureMetric(false);
-        SceneObservations observations = new SceneObservations();
-
-        //structure.cameras.grow();
-        //structure.setCamera(0, false, config.intrinsic);
 
         // Main Loop
         for (String imageFile : imageFiles){
             // add new view (detect features)
             int viewId = views.size();
             views.add(new View(viewId, imageFile, config));
-            //structure.views.grow();
-            //observations.views.grow();
 
             if (viewId != 0) {
                 // create tracks
                 int mid = viewId - 1;
                 views.get(viewId).addConnection(mid, views.get(mid).dscs, config);
-                views.get(viewId).mapTracks(structure, observations, tracks, views);
+                views.get(viewId).mapTracks(tracks, views);
 
                 // estimate pose
-                views.get(viewId).estimatePose(structure, tracks, views, config);
+                views.get(viewId).estimatePose(tracks, views, config);
             }
 
             // triangulate newly created tracks
-            views.get(viewId).triangulateTracks(structure, observations, tracks, views, config);
+            views.get(viewId).triangulateTracks(tracks, views, config);
         }
 
-        // Initialize
-        int cnt = 0;
-        for (Track track: tracks)
-            if (track.valid) cnt +=1;
-        structure.initialize(1, views.size(), cnt);
-        observations.initialize(views.size());
-
-        // set cameras
-        structure.setCamera(0, false, config.intrinsic);
-
-        // set views
-        structure.setView(0, 0, true, views.get(0).pose);
-        for (int viewId = 1; viewId < views.size(); viewId++) {
-            structure.setView(viewId, 0, true, views.get(viewId).conns.get(0).getMotion(),
-                    views.get(viewId).conns.get(0).viewId);
-        }
-        // set points
-        for (Track track: tracks){
-            if (track.valid){
-                structure.points.grow();
-                track.setValidId(structure.points.size-1);
-                structure.setPoint(track.validId, track.str.x, track.str.y, track.str.z);
-
-                for (int i = 0; i < track.viewIds.size(); i++) {
-                    int viewId = track.viewIds.get(i);
-                    observations.views.get(viewId).add(track.validId,
-                            (float)views.get(viewId).kps.get(track.kpids.get(i)).x,
-                            (float)views.get(viewId).kps.get(track.kpids.get(i)).y);
-                    structure.connectPointToView(track.validId, viewId);
-                }
-            }
-        }
+        // Initialize structure and observations for Bundle adjustment
+        SceneStructureMetric structure = new SceneStructureMetric(false);
+        SceneObservations observations = new SceneObservations();
+        View.wrapScene(structure, observations, tracks, views, config);
 
         // Bundle adjustment
         View.bundleAdjustment(structure, observations, config);
@@ -128,7 +92,6 @@ public class main {
 
         // Save point-cloud
         Track.saveCloud(structure, config);
-
     }
 
 }

@@ -71,8 +71,7 @@ public class View {
         FastAccess<AssociatedIndex> idxPair = features.match(this.dscs, matchViewDscs, config);
         this.conns.add(new Connection(matchViewId, idxPair, new Se3_F64()));
     }
-    public void mapTracks(SceneStructureMetric structure, SceneObservations observations,
-                          List<Track> tracks, List<View> views) {
+    public void mapTracks(List<Track> tracks, List<View> views) {
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
             View matchView = views.get(matchViewId);
@@ -98,34 +97,34 @@ public class View {
                 tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
                 tracks.get(mtrkId).length += 1;
                 this.trackIds.set(idxPair.get(i).src, mtrkId);
+
                 /*
                 if (tracks.get(mtrkId).valid) {
-                    structure.connectPointToView(tracks.get(mtrkId).validId, this.id);
                     observations.views.get(this.id).add(tracks.get(mtrkId).validId,
                             (float)views.get(this.id).kps.get(idxPair.get(i).src).x,
                             (float)views.get(this.id).kps.get(idxPair.get(i).src).y);
+                    structure.connectPointToView(tracks.get(mtrkId).validId, this.id);
                 }
-                */
+                 */
             }
         }
     }
-    public void triangulateTracks(SceneStructureMetric structure, SceneObservations observations,
-                                  List<Track> tracks, List<View> views, Config config){
+    public void triangulateTracks(List<Track> tracks, List<View> views, Config config){
         for (Track track: tracks){
             if (!track.valid) {
                 track.triangulateN(views, config);
                 /*
-                if (track.valid){
+                if (track.valid) {
                     structure.points.grow();
-                    track.setValidId(structure.points.size-1);
+                    track.setValidId(structure.points.size - 1);
                     structure.setPoint(track.validId, track.str.x, track.str.y, track.str.z);
 
                     for (int i = 0; i < track.viewIds.size(); i++) {
                         int viewId = track.viewIds.get(i);
-                        structure.connectPointToView(track.validId, viewId);
                         observations.views.get(viewId).add(track.validId,
-                                (float)views.get(viewId).kps.get(track.kpids.get(i)).x,
-                                (float)views.get(viewId).kps.get(track.kpids.get(i)).y);
+                                (float) views.get(viewId).kps.get(track.kpids.get(i)).x,
+                                (float) views.get(viewId).kps.get(track.kpids.get(i)).y);
+                        structure.connectPointToView(track.validId, viewId);
                     }
                 }
                  */
@@ -140,7 +139,7 @@ public class View {
         }
     }
 
-    public void estimatePose(SceneStructureMetric structure, List<Track> tracks, List<View> views, Config config){
+    public void estimatePose(List<Track> tracks, List<View> views, Config config){
         int mid = this.conns.get(0).viewId;
         View matchView = views.get(mid);
         Se3_F64 motionAtoB = new Se3_F64();;
@@ -164,7 +163,7 @@ public class View {
             motionWorldToB = motionAtoB.copy();
 
             config.init = true;
-            //structure.setView(0, 0, true, views.get(0).pose);
+            //structure.setView(0, 0, true, views.get(0).pose, -1);
         }
         else {
             // collect list of matches
@@ -210,11 +209,12 @@ public class View {
             }
         }
     }
-    public void viewTracks() {
+    public void viewTracks(List<Track> tracks) {
         Graphics2D vImg = this.img.createGraphics();
         for (int i = 0; i < this.kps.size(); i++) {
             if (this.trackIds.get(i) != -1) {
-                VisualizeFeatures.drawPoint(vImg, this.kps.get(i).x, this.kps.get(i).y, 2, Color.BLUE, false);
+                if (tracks.get(this.trackIds.get(i)).valid) VisualizeFeatures.drawPoint(vImg,
+                        this.kps.get(i).x, this.kps.get(i).y, 2, Color.BLUE, false);
             }
         }
     }
@@ -228,13 +228,46 @@ public class View {
     public static void viewViews(List<Track> tracks, List<View> views, Config config){
         for (View view : views){
             view.projectTracks(tracks, config);
-            view.viewTracks();
+            view.viewTracks(tracks);
             view.viewProjections();
             config.gui.addImage(view.img, view.file);
         }
         ShowImages.showWindow(config.gui,"detected features", true);
     }
+    public static void wrapScene(SceneStructureMetric structure, SceneObservations observations,
+                                 List<Track> tracks, List<View> views, Config config){
+        int cnt = 0;
+        for (Track track: tracks)
+            if (track.valid) cnt +=1;
+        structure.initialize(1, views.size(), cnt);
+        observations.initialize(views.size());
 
+        // set cameras
+        structure.setCamera(0, false, config.intrinsic);
+
+        // set views
+        structure.setView(0, 0, true, views.get(0).pose,-1);
+        for (int viewId = 1; viewId < views.size(); viewId++) {
+            structure.setView(viewId, 0, false, views.get(viewId).conns.get(0).getMotion(), -1);
+        }
+        // set points
+        int trackId = 0;
+        for (Track track: tracks){
+            if (track.valid){
+                track.setValidId(trackId);
+                structure.setPoint(track.validId, track.str.x, track.str.y, track.str.z);
+
+                for (int i = 0; i < track.viewIds.size(); i++) {
+                    int viewId = track.viewIds.get(i);
+                    observations.views.get(viewId).add(track.validId,
+                            (float)views.get(viewId).kps.get(track.kpids.get(i)).x,
+                            (float)views.get(viewId).kps.get(track.kpids.get(i)).y);
+                    structure.connectPointToView(track.validId, viewId);
+                }
+                trackId += 1;
+            }
+        }
+    }
     public static void bundleAdjustment(SceneStructureMetric structure, SceneObservations observations, Config config){
         config.bundleScale.applyScale(structure, observations);
         config.bundleAdjustment.setParameters(structure, observations);

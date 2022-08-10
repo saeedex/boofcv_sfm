@@ -1,5 +1,7 @@
 package ninox360;
 
+import boofcv.abst.geo.bundle.SceneStructureCommon;
+import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.cloud.PointCloudReader;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.WorldToCameraToPixel;
@@ -28,6 +30,7 @@ public class Track {
     List<Integer> kpids;
     Point3D_F64 str = new Point3D_F64();
     boolean valid = false;
+    int validId;
 
     public Track(int id, int length, List<Integer> viewIds, List<Integer> kpids){
         this.id = id;
@@ -35,6 +38,8 @@ public class Track {
         this.kpids = kpids;
         this.length = length;
     }
+
+    public void setValidId(int validId){this.validId = validId;}
 
     /**
      * triangulates a track.
@@ -77,23 +82,23 @@ public class Track {
         return kps;
     }
 
-    public static void saveCloud(List<Track> tracks, Config config) throws IOException {
+    public static void saveCloud(SceneStructureMetric structure, Config config) throws IOException {
         List<Point3dRgbI_F64> cloud = new ArrayList<>();
-        for (Track track: tracks){
-            if (track.valid) {
-                cloud.add(new Point3dRgbI_F64(track.str.getX(), track.str.getY(), track.str.getZ(), 255));
-            }
+        for (int i = 0; i < structure.points.size; i++) {
+            Point3D_F64 world = new Point3D_F64();
+            structure.points.get(i).get(world);
+            cloud.add(new Point3dRgbI_F64(world.getX(), world.getY(), world.getZ(), 255));
         }
         cloud.toArray(new Point3dRgbI_F64[0]);
         OutputStream out = new FileOutputStream("saved_cloud.ply");
         PointCloudIO.save3D(PointCloudIO.Format.PLY, PointCloudReader.wrapF64RGB(cloud), true, out);
     }
 
-    public static void addCloud2viewer(List<Track> tracks, Config config){
-        for (Track track: tracks){
-            if (track.valid) {
-                config.viewer.addPoint(track.str.getX(), track.str.getY(), track.str.getZ(), 255);
-            }
+    public static void addCloud2viewer(SceneStructureMetric structure, Config config){
+        for (int i = 0; i < structure.points.size; i++) {
+            Point3D_F64 world = new Point3D_F64();
+            structure.points.get(i).get(world);
+            config.viewer.addPoint(world.getX(), world.getY(), world.getZ(), 255);
         }
     }
 }

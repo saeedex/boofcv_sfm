@@ -1,10 +1,12 @@
 package ninox360;
 
+import boofcv.abst.geo.bundle.SceneObservations;
 import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.gui.feature.VisualizeFeatures;
 import boofcv.gui.image.ShowImages;
 import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
+import boofcv.misc.BoofMiscOps;
 import boofcv.struct.feature.AssociatedIndex;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
@@ -69,7 +71,8 @@ public class View {
         FastAccess<AssociatedIndex> idxPair = features.match(this.dscs, matchViewDscs, config);
         this.conns.add(new Connection(matchViewId, idxPair, new Se3_F64()));
     }
-    public void mapTracks(List<Track> tracks, List<View> views) {
+    public void mapTracks(SceneStructureMetric structure, SceneObservations observations,
+                          List<Track> tracks, List<View> views) {
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
             View matchView = views.get(matchViewId);
@@ -90,11 +93,42 @@ public class View {
                     mtrkId = trkId;
                 }
 
-                // Update existing tracks
+                // Update existing tracks and structure
                 tracks.get(mtrkId).viewIds.add(this.id);
                 tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
                 tracks.get(mtrkId).length += 1;
                 this.trackIds.set(idxPair.get(i).src, mtrkId);
+                /*
+                if (tracks.get(mtrkId).valid) {
+                    structure.connectPointToView(tracks.get(mtrkId).validId, this.id);
+                    observations.views.get(this.id).add(tracks.get(mtrkId).validId,
+                            (float)views.get(this.id).kps.get(idxPair.get(i).src).x,
+                            (float)views.get(this.id).kps.get(idxPair.get(i).src).y);
+                }
+                */
+            }
+        }
+    }
+    public void triangulateTracks(SceneStructureMetric structure, SceneObservations observations,
+                                  List<Track> tracks, List<View> views, Config config){
+        for (Track track: tracks){
+            if (!track.valid) {
+                track.triangulateN(views, config);
+                /*
+                if (track.valid){
+                    structure.points.grow();
+                    track.setValidId(structure.points.size-1);
+                    structure.setPoint(track.validId, track.str.x, track.str.y, track.str.z);
+
+                    for (int i = 0; i < track.viewIds.size(); i++) {
+                        int viewId = track.viewIds.get(i);
+                        structure.connectPointToView(track.validId, viewId);
+                        observations.views.get(viewId).add(track.validId,
+                                (float)views.get(viewId).kps.get(track.kpids.get(i)).x,
+                                (float)views.get(viewId).kps.get(track.kpids.get(i)).y);
+                    }
+                }
+                 */
             }
         }
     }
@@ -127,14 +161,10 @@ public class View {
             if (!config.epiMotion.process(matches))
                 throw new RuntimeException("Motion estimation failed");
             motionAtoB = config.epiMotion.getModelParameters();
-
-            //List<AssociatedPair> inliers = new ArrayList<>();
-            //motionAtoB = reconstruction.estimateCameraMotion(config.intrinsic, matches, inliers, config);
-
             motionWorldToB = motionAtoB.copy();
 
             config.init = true;
-            structure.setView(0, 0, true, views.get(0).pose);
+            //structure.setView(0, 0, true, views.get(0).pose);
         }
         else {
             // collect list of matches
@@ -167,23 +197,9 @@ public class View {
         // set camera pose and relative motion
         this.setPose(motionWorldToB);
         this.conns.get(0).setMotion(motionAtoB);
-        structure.setView(id, 0, true, views.get(id).conns.get(0).getMotion(), mid);
+        //structure.setView(id, 0, true, views.get(id).conns.get(0).getMotion(), mid);
     }
 
-    public void triangulateTracks(SceneStructureMetric structure, List<Track> tracks, List<View> views, Config config){
-        for (Track track: tracks){
-            if (!track.valid) {
-                track.triangulateN(views, config);
-                if (track.valid){
-                    structure.points.grow();
-                    structure.setPoint(structure.points.size-1, track.str.x, track.str.y, track.str.z);
-                    for (int viewId:track.viewIds){
-                        structure.connectPointToView(structure.points.size-1, viewId);
-                    }
-                }
-            }
-        }
-    }
     public void projectTracks(List<Track> tracks, Config config){
         for (int trackId : this.trackIds) {
             if (trackId != -1) {
@@ -217,5 +233,19 @@ public class View {
             config.gui.addImage(view.img, view.file);
         }
         ShowImages.showWindow(config.gui,"detected features", true);
+    }
+
+    public static void bundleAdjustment(SceneStructureMetric structure, SceneObservations observations, Config config){
+        config.bundleScale.applyScale(structure, observations);
+        config.bundleAdjustment.setParameters(structure, observations);
+        long startTime = System.currentTimeMillis();
+        double errorBefore = config.bundleAdjustment.getFitScore();
+        if (!config.bundleAdjustment.optimize(structure)) {
+            throw new RuntimeException("Bundle adjustment failed?!?");
+        }
+        System.out.println();
+        System.out.printf("Error reduced by %.1f%%\n", (100.0*(errorBefore/config.bundleAdjustment.getFitScore() - 1.0)));
+        System.out.println(BoofMiscOps.milliToHuman(System.currentTimeMillis() - startTime));
+        config.bundleScale.undoScale(structure, observations);
     }
 }

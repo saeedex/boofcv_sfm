@@ -9,6 +9,9 @@ import boofcv.abst.geo.Estimate1ofPnP;
 import boofcv.abst.geo.RefinePnP;
 import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.abst.geo.TriangulateNViewsMetric;
+import boofcv.abst.geo.bundle.BundleAdjustment;
+import boofcv.abst.geo.bundle.ScaleSceneStructure;
+import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.WorldToCameraToPixel;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
@@ -32,6 +35,7 @@ import georegression.metric.UtilAngle;
 import georegression.struct.se.Se3_F64;
 import org.ddogleg.fitting.modelset.ModelFitter;
 import org.ddogleg.fitting.modelset.ModelMatcher;
+import org.ddogleg.optimization.lm.ConfigLevenbergMarquardt;
 import org.ejml.data.DMatrixRMaj;
 
 import java.awt.*;
@@ -49,13 +53,14 @@ public class Config {
 
     RefinePnP refinePnP;
 
-    ModelMatcher<DMatrixRMaj, AssociatedPair> funRansac;
-    ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
-    ModelFitter<DMatrixRMaj, AssociatedPair> refine;
     TriangulateNViewsMetric trian;
     CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
     Point2Transform2_F64 norm;
+
+    ScaleSceneStructure bundleScale;
+    BundleAdjustment<SceneStructureMetric> bundleAdjustment;
+
     boolean init = false;
 
     PointCloudViewer viewer;
@@ -89,6 +94,17 @@ public class Config {
         // triangulation
         // ConfigTriangulation.Type.GEOMETRIC resulted in better triangulation accuracy
         this.trian = FactoryMultiView.triangulateNViewMetric(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
+
+        // Bundle adjustment
+        var configLM = new ConfigLevenbergMarquardt();
+        configLM.dampeningInitial = 1e-3;
+        configLM.hessianScaling = true;
+        var configSBA = new ConfigBundleAdjustment();
+        configSBA.configOptimizer = configLM;
+        this.bundleAdjustment = FactoryMultiView.bundleSparseMetric(configSBA);
+        this.bundleAdjustment.setVerbose(System.out, null);
+        this.bundleAdjustment.configure(1e-6, 1e-6, 50);
+        this.bundleScale = new ScaleSceneStructure();
 
         // Viewer
         this.viewer = VisualizeData.createPointCloudViewer();

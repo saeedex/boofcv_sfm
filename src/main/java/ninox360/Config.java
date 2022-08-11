@@ -53,9 +53,6 @@ public class Config {
     CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
     Point2Transform2_F64 norm;
-
-    ScaleSceneStructure bundleScale;
-    BundleAdjustment<SceneStructureMetric> bundleAdjustment;
     double geoThreshold;
     boolean init = false;
 
@@ -93,17 +90,6 @@ public class Config {
         // triangulation
         // ConfigTriangulation.Type.GEOMETRIC resulted in better triangulation accuracy
         this.trian = FactoryMultiView.triangulateNViewMetric(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
-
-        // Bundle adjustment
-        var configLM = new ConfigLevenbergMarquardt();
-        configLM.dampeningInitial = 1e-3;
-        configLM.hessianScaling = true;
-        var configSBA = new ConfigBundleAdjustment();
-        configSBA.configOptimizer = configLM;
-        this.bundleAdjustment = FactoryMultiView.bundleSparseMetric(configSBA);
-        this.bundleAdjustment.setVerbose(null, null);
-        this.bundleAdjustment.configure(1e-6, 1e-6, 50);
-        this.bundleScale = new ScaleSceneStructure();
 
         // Viewer
         this.viewer = VisualizeData.createPointCloudViewer();

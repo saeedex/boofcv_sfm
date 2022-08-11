@@ -80,12 +80,14 @@ public class main {
             }
         }
         // Bundle adjustment
-        View.bundleAdjustment(tracks, views, config);
+        Optimizer optimizer = new Optimizer();
+        optimizer.initScene(tracks, views);
+        optimizer.wrapScene(tracks, views, config);
+        optimizer.process();
+        optimizer.unwrapScene(tracks, views, config);
 
         // Visualize
-        SceneStructureMetric structure = new SceneStructureMetric(false);
-        SceneObservations observations = new SceneObservations();
-        View.wrapScene(structure, observations, tracks, views, config);
+        SceneStructureMetric structure = optimizer.scene.getStructure();
         View.viewViews(tracks, views, config);
         Track.addCloud2viewer(structure, config);
         SwingUtilities.invokeLater(() -> {

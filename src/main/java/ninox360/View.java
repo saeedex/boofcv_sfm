@@ -1,5 +1,6 @@
 package ninox360;
 
+import boofcv.abst.geo.bundle.MetricBundleAdjustmentUtils;
 import boofcv.abst.geo.bundle.SceneObservations;
 import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.geo.PerspectiveOps;
@@ -252,9 +253,20 @@ public class View {
         structure.setCamera(0, false, config.intrinsic);
 
         // set views
+        /*
         structure.setView(0, 0, true, views.get(0).pose,-1);
         for (int viewId = 1; viewId < views.size(); viewId++) {
             structure.setView(viewId, 0, false, views.get(viewId).conns.get(0).getMotion(), viewId-1);
+        }
+         */
+        for (int viewId = 0; viewId < views.size(); viewId++) {
+            int world_to_left_idx;
+            if (viewId==0)
+                world_to_left_idx = structure.addMotion(true, views.get(viewId).pose);
+            else
+                world_to_left_idx = structure.addMotion(false, views.get(viewId).pose);
+
+            structure.setView(viewId, 0, world_to_left_idx, -1);
         }
         // set points
         int trackId = 0;
@@ -282,9 +294,15 @@ public class View {
         config.K = PerspectiveOps.pinholeToMatrix(config.intrinsic, (DMatrixRMaj)null);
 
         // get views
+        /*
         views.get(0).setPose(structure.getParentToView(0));
         for (int viewId = 1; viewId < views.size(); viewId++) {
             views.get(viewId).conns.get(0).setMotion(structure.getParentToView(viewId));
+        }
+        */
+
+        for (int viewId = 0; viewId < views.size(); viewId++) {
+            views.get(viewId).setPose(structure.getParentToView(viewId));
         }
 
         // get points
@@ -303,7 +321,7 @@ public class View {
         View.wrapScene(structure, observations, tracks, views, config);
 
         // bundle adjustment
-        //config.bundleScale.applyScale(structure, observations);
+        config.bundleScale.applyScale(structure, observations);
         config.bundleAdjustment.setParameters(structure, observations);
         long startTime = System.currentTimeMillis();
         double errorBefore = config.bundleAdjustment.getFitScore();
@@ -313,7 +331,7 @@ public class View {
         System.out.println();
         System.out.printf("Error reduced by %.1f%%\n", (100.0*(errorBefore/config.bundleAdjustment.getFitScore() - 1.0)));
         System.out.println(BoofMiscOps.milliToHuman(System.currentTimeMillis() - startTime));
-        //config.bundleScale.undoScale(structure, observations);
+        config.bundleScale.undoScale(structure, observations);
 
         // unwrap Bundle Adjustment results
         View.unwrapScene(structure, observations, tracks, views, config);

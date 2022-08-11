@@ -58,9 +58,9 @@ public class main {
 
         Config config = new Config(1000, 0.4, 2.0);
         if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
-        config.intrinsic.print();
         // Main Loop
         for (String imageFile : imageFiles){
+            System.out.println(imageFile);
             // add new view (detect features)
             int viewId = views.size();
             //System.out.println(viewId);
@@ -80,7 +80,7 @@ public class main {
             }
         }
         // Bundle adjustment
-        //View.bundleAdjustment(tracks, views, config);
+        View.bundleAdjustment(tracks, views, config);
 
         // Visualize
         SceneStructureMetric structure = new SceneStructureMetric(false);

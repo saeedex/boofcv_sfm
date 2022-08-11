@@ -55,7 +55,7 @@ public class Track {
         }
 
         if (config.trian.triangulate(matches, poses, pt)) {
-            if (pt.z > 0) {
+            if (pt.z > 0 && pt.z < 50) {
                 this.str = pt;
                 this.valid = true;
 

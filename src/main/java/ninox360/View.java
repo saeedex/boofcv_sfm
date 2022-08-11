@@ -92,9 +92,7 @@ public class View {
                     viewIds.add(matchViewId);
                     kpIds.add(idxPair.get(i).dst);
                     tracks.add(new Track(tracks.size(), 1, viewIds, kpIds));
-                    int trkId = tracks.size() - 1;
-                    matchView.trackIds.set(idxPair.get(i).dst, trkId);
-                    mtrkId = trkId;
+                    mtrkId = tracks.size() - 1;
                 }
 
                 // Update existing tracks and structure
@@ -102,40 +100,13 @@ public class View {
                 tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
                 tracks.get(mtrkId).length += 1;
                 this.trackIds.set(idxPair.get(i).src, mtrkId);
-
-                /*
-                if (tracks.get(mtrkId).valid) {
-                    observations.views.get(this.id).add(tracks.get(mtrkId).validId,
-                            (float)views.get(this.id).kps.get(idxPair.get(i).src).x,
-                            (float)views.get(this.id).kps.get(idxPair.get(i).src).y);
-                    structure.connectPointToView(tracks.get(mtrkId).validId, this.id);
-                }
-                 */
+                matchView.trackIds.set(idxPair.get(i).dst, mtrkId);
             }
         }
     }
     public void triangulateTracks(List<Track> tracks, List<View> views, Config config){
-        int cnt = 0;
-        for (Track track: tracks){
-            if (!track.valid) {
-                track.triangulateN(views, config);
-                if (track.valid) cnt += 1;
-                /*
-                if (track.valid) {
-                    structure.points.grow();
-                    track.setValidId(structure.points.size - 1);
-                    structure.setPoint(track.validId, track.str.x, track.str.y, track.str.z);
-
-                    for (int i = 0; i < track.viewIds.size(); i++) {
-                        int viewId = track.viewIds.get(i);
-                        observations.views.get(viewId).add(track.validId,
-                                (float) views.get(viewId).kps.get(track.kpids.get(i)).x,
-                                (float) views.get(viewId).kps.get(track.kpids.get(i)).y);
-                        structure.connectPointToView(track.validId, viewId);
-                    }
-                }
-                 */
-            }
+        for (int trackId : this.trackIds) {
+            if (trackId != -1) tracks.get(trackId).triangulateN(views, config);
         }
     }
     public void normKps(Config config){

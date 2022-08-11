@@ -51,18 +51,22 @@ import java.util.List;
 public class main {
     public static void main(String[] args) throws IOException {
         // Config
-        String imageDirectory = "../dataset/04/";
+        String imageDirectory = "../dataset/01/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<View> views = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
+        Optimizer optimizer = new Optimizer();
 
-        Config config = new Config(1000, 0.4, 2.0);
+        Config config = new Config(1000, 0.8, 2.0);
         if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
         // Main Loop
         for (String imageFile : imageFiles){
-            System.out.println(imageFile);
+
             // add new view (detect features)
             int viewId = views.size();
+            System.out.println("Registered view:");
+            System.out.println(viewId);
+
             //System.out.println(viewId);
             views.add(new View(viewId, imageFile, config));
 
@@ -80,14 +84,13 @@ public class main {
             }
         }
         // Bundle adjustment
-        Optimizer optimizer = new Optimizer();
         optimizer.initScene(tracks, views);
-        optimizer.wrapScene(tracks, views, config);
+        optimizer.wrapGraph(tracks, views, config);
         optimizer.process();
-        optimizer.unwrapScene(tracks, views, config);
+        optimizer.unwrapGraph(tracks, views, config);
 
         // Visualize
-        SceneStructureMetric structure = optimizer.scene.getStructure();
+        SceneStructureMetric structure = optimizer.graph.getStructure();
         View.viewViews(tracks, views, config);
         Track.addCloud2viewer(structure, config);
         SwingUtilities.invokeLater(() -> {

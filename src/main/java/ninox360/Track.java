@@ -71,7 +71,7 @@ public class Track {
                     res += sqrt(diffx*diffx + diffy*diffy);
                 }
                 res = res/this.viewIds.size();
-                if(res > 1.0) this.valid = false;
+                if(res > config.geoThreshold) this.valid = false;
             }
         }
     }

@@ -5,17 +5,22 @@ import boofcv.abst.geo.bundle.ScaleSceneStructure;
 import boofcv.abst.geo.bundle.SceneObservations;
 import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.cloud.PointCloudReader;
+import boofcv.alg.geo.PerspectiveOps;
+import boofcv.alg.geo.bundle.BundleAdjustmentOps;
+import boofcv.alg.geo.bundle.cameras.BundlePinholeBrown;
 import boofcv.factory.geo.ConfigBundleAdjustment;
 import boofcv.factory.geo.FactoryMultiView;
 import boofcv.gui.BoofSwingUtil;
 import boofcv.gui.ListDisplayPanel;
 import boofcv.gui.image.ShowImages;
 import boofcv.io.UtilIO;
+import boofcv.io.calibration.CalibrationIO;
 import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
 import boofcv.io.points.PointCloudIO;
 import boofcv.misc.BoofMiscOps;
 import boofcv.struct.Point3dRgbI_F64;
+import boofcv.struct.calib.CameraPinholeBrown;
 import boofcv.struct.feature.AssociatedIndex;
 import boofcv.struct.image.GrayF32;
 import boofcv.visualize.PointCloudViewer;
@@ -46,18 +51,19 @@ import java.util.List;
 public class main {
     public static void main(String[] args) throws IOException {
         // Config
-        String imageDirectory = "../dataset/03/";
+        String imageDirectory = "../dataset/04/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<View> views = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
 
-        Config config = new Config(500, 0.1, 0.8);
-        config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
-
+        Config config = new Config(1000, 0.4, 2.0);
+        if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
+        config.intrinsic.print();
         // Main Loop
         for (String imageFile : imageFiles){
             // add new view (detect features)
             int viewId = views.size();
+            //System.out.println(viewId);
             views.add(new View(viewId, imageFile, config));
 
             if (viewId != 0) {
@@ -68,21 +74,18 @@ public class main {
 
                 // estimate pose
                 views.get(viewId).estimatePose(tracks, views, config);
+
+                // triangulate tracks
+                views.get(viewId).triangulateTracks(tracks, views, config);
             }
-
-            // triangulate newly created tracks
-            views.get(viewId).triangulateTracks(tracks, views, config);
         }
+        // Bundle adjustment
+        //View.bundleAdjustment(tracks, views, config);
 
-        // Initialize structure and observations for Bundle adjustment
+        // Visualize
         SceneStructureMetric structure = new SceneStructureMetric(false);
         SceneObservations observations = new SceneObservations();
         View.wrapScene(structure, observations, tracks, views, config);
-
-        // Bundle adjustment
-        View.bundleAdjustment(structure, observations, config);
-
-        // Visualize
         View.viewViews(tracks, views, config);
         Track.addCloud2viewer(structure, config);
         SwingUtilities.invokeLater(() -> {
@@ -90,8 +93,9 @@ public class main {
             ShowImages.showWindow(config.viewer.getComponent(), "Refined Scene", true);
         });
 
-        // Save point-cloud
+        // Save output
         Track.saveCloud(structure, config);
+        //CalibrationIO.save(config.intrinsic, "intrinsic.yaml");
     }
 
 }

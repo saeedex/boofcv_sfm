@@ -5,15 +5,12 @@ import boofcv.abst.feature.associate.ScoreAssociation;
 import boofcv.abst.feature.detdesc.DetectDescribePoint;
 import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
-import boofcv.abst.geo.Estimate1ofPnP;
 import boofcv.abst.geo.RefinePnP;
-import boofcv.abst.geo.Triangulate2ViewsMetric;
 import boofcv.abst.geo.TriangulateNViewsMetric;
 import boofcv.abst.geo.bundle.BundleAdjustment;
 import boofcv.abst.geo.bundle.ScaleSceneStructure;
 import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.geo.PerspectiveOps;
-import boofcv.alg.geo.WorldToCameraToPixel;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.factory.distort.LensDistortionFactory;
 import boofcv.factory.feature.associate.ConfigAssociateGreedy;
@@ -21,7 +18,7 @@ import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
 import boofcv.factory.geo.*;
 import boofcv.gui.ListDisplayPanel;
-import boofcv.misc.ConfigConverge;
+import boofcv.io.calibration.CalibrationIO;
 import boofcv.struct.calib.CameraPinholeBrown;
 import boofcv.struct.distort.Point2Transform2_F64;
 import boofcv.struct.feature.TupleDesc_F64;
@@ -33,13 +30,12 @@ import boofcv.visualize.TwoAxisRgbPlane;
 import boofcv.visualize.VisualizeData;
 import georegression.metric.UtilAngle;
 import georegression.struct.se.Se3_F64;
-import org.ddogleg.fitting.modelset.ModelFitter;
-import org.ddogleg.fitting.modelset.ModelMatcher;
 import org.ddogleg.optimization.lm.ConfigLevenbergMarquardt;
 import org.ejml.data.DMatrixRMaj;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
 
 public class Config {
     DetectDescribePoint<GrayF32, TupleDesc_F64> describer;
@@ -60,7 +56,7 @@ public class Config {
 
     ScaleSceneStructure bundleScale;
     BundleAdjustment<SceneStructureMetric> bundleAdjustment;
-
+    double geoThreshold;
     boolean init = false;
 
     PointCloudViewer viewer;
@@ -77,9 +73,10 @@ public class Config {
         this.matcher = FactoryAssociation.greedy(new ConfigAssociateGreedy(true, matcherThreshold), this.scorer);
 
         // ransac
+        this.geoThreshold = inlierThreshold;
         var configRansac = new ConfigRansac();
         configRansac.inlierThreshold = inlierThreshold;
-        configRansac.iterations = 1000;
+        configRansac.iterations = 400;
 
         // motion
         ConfigEssential configEssential = new ConfigEssential();
@@ -88,6 +85,8 @@ public class Config {
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
 
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
+        ConfigPnP configPnP = new ConfigPnP();
+
         this.estimatePnP = FactoryMultiViewRobust.pnpRansac(new ConfigPnP(), configRansac);
         this.refinePnP = FactoryMultiView.pnpRefine(1e-12,40);
 
@@ -102,7 +101,7 @@ public class Config {
         var configSBA = new ConfigBundleAdjustment();
         configSBA.configOptimizer = configLM;
         this.bundleAdjustment = FactoryMultiView.bundleSparseMetric(configSBA);
-        this.bundleAdjustment.setVerbose(System.out, null);
+        this.bundleAdjustment.setVerbose(null, null);
         this.bundleAdjustment.configure(1e-6, 1e-6, 50);
         this.bundleScale = new ScaleSceneStructure();
 
@@ -119,9 +118,22 @@ public class Config {
     public void getIntrinsic(BufferedImage sample){
         int height = sample.getHeight();
         int width = sample.getWidth();
-        this.intrinsic = new CameraPinholeBrown(height, height, 0, width/2, height/2, width, height);
+
+        this.intrinsic = new CameraPinholeBrown(width, width, 0, width/2, height/2, width, height);
         this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
         this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
+    }
+
+    public boolean loadIntrinsic(String imageDirectory){
+        File file = new File(imageDirectory,"intrinsic.yaml");
+        boolean flag = false;
+        if (file.exists()) {
+            this.intrinsic = CalibrationIO.load(file);
+            this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
+            this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
+            flag = true;
+        }
+        return flag;
     }
 
 }

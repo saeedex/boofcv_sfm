@@ -51,7 +51,7 @@ import java.util.List;
 public class main {
     public static void main(String[] args) throws IOException {
         // Config
-        String imageDirectory = "../dataset/04/";
+        String imageDirectory = "../dataset/01/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<View> views = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
@@ -72,7 +72,7 @@ public class main {
                 // create new tracks
                 int mid = viewId - 1;
                 views.get(viewId).addConnection(mid, views.get(mid).dscs, config);
-                if (mid-1 >= 0) views.get(viewId).addConnection(mid-1, views.get(mid-1).dscs, config);
+                if (viewId == 89) views.get(viewId).addConnection(0, views.get(0).dscs, config); //loop closure here
 
                 views.get(viewId).mapTracks(tracks, views);
 

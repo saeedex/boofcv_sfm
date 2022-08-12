@@ -128,6 +128,32 @@ public class View {
                             matchView.trackIds.set(idxPair.get(i).dst, trkId);
                         }
                     }
+
+                    // otherwise tracks are duplicates
+                    else {
+                        if (mtrkId != trkId) {
+                            // merge newer track to the older track
+                            for (int j = 0; j < tracks.get(trkId).viewIds.size(); j++){
+                                // allow only one association per pair
+                                int newId = tracks.get(trkId).viewIds.get(j);
+                                if (!tracks.get(mtrkId).viewIds.contains(newId)){
+                                    // update existing track
+                                    tracks.get(mtrkId).viewIds.add(newId);
+                                    tracks.get(mtrkId).kpids.add(tracks.get(trkId).kpids.get(j));
+                                    tracks.get(mtrkId).inliers.add(tracks.get(trkId).inliers.get(j));
+                                    tracks.get(mtrkId).length += 1;
+                                    // update track ids
+                                    views.get(newId).trackIds.set(tracks.get(trkId).kpids.get(j), mtrkId);
+                                }
+                            }
+
+                            // remove newer track
+                            tracks.get(trkId).valid = false;
+                            tracks.get(trkId).viewIds = new ArrayList<>();
+                            tracks.get(trkId).kpids = new ArrayList<>();
+                            tracks.get(trkId).length = 0;
+                        }
+                    }
                 }
             }
         }

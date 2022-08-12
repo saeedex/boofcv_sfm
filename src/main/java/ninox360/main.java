@@ -91,8 +91,10 @@ public class main {
         Optimizer optimizer = new Optimizer();
         optimizer.initGraph(tracks, views);
         optimizer.wrapGraph(tracks, views, config);
-        //optimizer.process();
+        optimizer.process();
         optimizer.unwrapGraph(tracks, views, config);
+
+
 
 
         // Visualize

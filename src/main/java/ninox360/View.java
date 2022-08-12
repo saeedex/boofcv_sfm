@@ -58,9 +58,9 @@ public class View {
     List<Connection> conns = new ArrayList<>();
 
 
-    public View(int id, String file, Config config){
+    public View(int id, String file, Config config, Feat feat){
         BufferedImage img = UtilImageIO.loadImageNotNull(file);
-        Feat feat = features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config);
+        //Feat feat = features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config);
         this.id = id;
         this.file = file;
         this.img = img;

@@ -55,7 +55,7 @@ public class main {
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<View> views = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
-        Optimizer optimizer = new Optimizer();
+
 
         Config config = new Config(1000, 0.8, 2.0);
         if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
@@ -64,9 +64,6 @@ public class main {
 
             // add new view (detect features)
             int viewId = views.size();
-            System.out.println("Registered view:");
-            System.out.println(viewId);
-
             //System.out.println(viewId);
             views.add(new View(viewId, imageFile, config));
 
@@ -81,13 +78,22 @@ public class main {
 
                 // triangulate tracks
                 views.get(viewId).triangulateTracks(tracks, views, config);
+
+                //Optimizer optimizer = new Optimizer();
+                //optimizer.initGraph(tracks, views);
+                //optimizer.wrapGraph(tracks, views, config);
+                //optimizer.process();
+                //optimizer.unwrapGraph(tracks, views, config);
             }
+            System.out.printf("Registered view: %d\n", viewId);
         }
         // Bundle adjustment
-        optimizer.initScene(tracks, views);
+        Optimizer optimizer = new Optimizer();
+        optimizer.initGraph(tracks, views);
         optimizer.wrapGraph(tracks, views, config);
-        optimizer.process();
+        //optimizer.process();
         optimizer.unwrapGraph(tracks, views, config);
+
 
         // Visualize
         SceneStructureMetric structure = optimizer.graph.getStructure();

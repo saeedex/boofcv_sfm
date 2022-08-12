@@ -28,18 +28,18 @@ public class Track {
     int length;
     List<Integer> viewIds;
     List<Integer> kpids;
+    List<Boolean> inliers;
+
     Point3D_F64 str = new Point3D_F64();
     boolean valid = false;
-    int validId;
 
-    public Track(int id, int length, List<Integer> viewIds, List<Integer> kpids){
+    public Track(int id, int length, List<Integer> viewIds, List<Integer> kpids, List<Boolean> inliers){
         this.id = id;
         this.viewIds = viewIds;
         this.kpids = kpids;
         this.length = length;
+        this.inliers = inliers;
     }
-
-    public void setValidId(int validId){this.validId = validId;}
 
     /**
      * triangulates a track.
@@ -55,24 +55,29 @@ public class Track {
         }
 
         if (config.trian.triangulate(matches, poses, pt)) {
-            if (pt.z > 0 && pt.z < 50) {
+            if (pt.z > 0) {
                 this.str = pt;
                 this.valid = true;
-
-                double diffx;
-                double diffy;
-                double res = 0;
-                for (int i = 0; i < this.viewIds.size(); i++) {
-                    View view = views.get(this.viewIds.get(i));
-                    Point2D_F64 prj = this.project(view, config);
-
-                    diffx = (prj.x - view.kps.get(this.kpids.get(i)).x);
-                    diffy = (prj.y - view.kps.get(this.kpids.get(i)).y);
-                    res += sqrt(diffx*diffx + diffy*diffy);
-                }
-                res = res/this.viewIds.size();
-                if(res > config.geoThreshold) this.valid = false;
             }
+        }
+    }
+    public void filter(List<View> views, Config config){
+        if (this.valid){
+            double eucDist;
+            double res = 0;
+            int totInliers = 0;
+            for (int i = 0; i < this.viewIds.size(); i++) {
+                View view = views.get(this.viewIds.get(i));
+                Point2D_F64 prj = this.project(view, config);
+                eucDist = prj.distance(view.kps.get(this.kpids.get(i)));
+                if (eucDist > config.geoThreshold) {
+                    this.inliers.set(i, false);
+                    totInliers +=1;
+                    res += eucDist;
+                }
+            }
+            //if(totInliers < 2) this.valid = false;
+            if(res/totInliers > config.geoThreshold) this.valid = false;
         }
     }
     public Point2D_F64 project(View view, Config config){

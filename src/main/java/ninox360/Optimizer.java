@@ -9,7 +9,6 @@ import boofcv.alg.geo.bundle.BundleAdjustmentOps;
 import boofcv.alg.geo.bundle.cameras.BundlePinholeBrown;
 import boofcv.factory.geo.ConfigBundleAdjustment;
 import boofcv.factory.geo.FactoryMultiView;
-import georegression.struct.point.Point2D_F64;
 import georegression.struct.point.Point4D_F64;
 import org.ddogleg.optimization.lm.ConfigLevenbergMarquardt;
 import org.ejml.data.DMatrixRMaj;
@@ -44,8 +43,10 @@ public class Optimizer {
         var configSBA = new ConfigBundleAdjustment();
         configSBA.configOptimizer = configLM;
         this.bundleAdjustment = FactoryMultiView.bundleSparseMetric(configSBA);
+        //this.bundleAdjustment = FactoryMultiView.bundleDenseMetric(true, null);
+
         this.bundleAdjustment.setVerbose(null, null);
-        this.bundleAdjustment.configure(1e-6, 1e-6, 50);
+        this.bundleAdjustment.configure(1e-12, 1e-12, 50);
         this.bundleScale = new ScaleSceneStructure();
 
         SceneStructureMetric structure = new SceneStructureMetric(true); //pay attention
@@ -53,7 +54,7 @@ public class Optimizer {
         this.graph = new Graph(structure, observations);
     }
 
-    public void initScene(List<Track> tracks, List<View> views){
+    public void initGraph(List<Track> tracks, List<View> views){
         SceneStructureMetric structure = this.graph.getStructure();
         SceneObservations observations = this.graph.getObservations();
 
@@ -81,16 +82,16 @@ public class Optimizer {
         int trackId = 0;
         for (Track track: tracks){
             if (track.valid){
-                track.setValidId(trackId);
-                structure.points.get(track.validId).set(track.str.x, track.str.y, track.str.z, 1.0);
+                structure.points.get(trackId).set(track.str.x, track.str.y, track.str.z, 1.0);
 
                 for (int i = 0; i < track.viewIds.size(); i++) {
-                    int viewId = track.viewIds.get(i);
-                    observations.views.get(viewId).add(track.validId,
-                            (float) views.get(viewId).kps.get(track.kpids.get(i)).x,
-                            (float) views.get(viewId).kps.get(track.kpids.get(i)).y);
-                    structure.connectPointToView(track.validId, viewId);
-
+                    if (track.inliers.get(i)) {
+                        int viewId = track.viewIds.get(i);
+                        observations.views.get(viewId).add(trackId,
+                                (float) views.get(viewId).kps.get(track.kpids.get(i)).x,
+                                (float) views.get(viewId).kps.get(track.kpids.get(i)).y);
+                        structure.connectPointToView(trackId, viewId);
+                    }
                 }
                 trackId += 1;
             }
@@ -134,17 +135,15 @@ public class Optimizer {
         // bundle adjustment
         //this.bundleScale.applyScale(structure, observations);
         this.bundleAdjustment.setParameters(structure, observations);
-
-        System.out.println(this.bundleAdjustment.getFitScore());
-
-        long startTime = System.currentTimeMillis();
-        double errorBefore = this.bundleAdjustment.getFitScore();
+        double errorBefore = this.bundleAdjustment.getFitScore()/structure.getObservationCount();
         if (!this.bundleAdjustment.optimize(structure)) {
             throw new RuntimeException("Bundle adjustment failed?!?");
         }
-        System.out.println(this.bundleAdjustment.getFitScore());
-        //System.out.printf("Error reduced by %.1f%%\n", (100.0*(errorBefore/this.bundleAdjustment.getFitScore() - 1.0)));
-        //System.out.println(BoofMiscOps.milliToHuman(System.currentTimeMillis() - startTime));
+        double errorAfter = this.bundleAdjustment.getFitScore()/structure.getObservationCount();
+        System.out.println(this.bundleAdjustment.getFitScore()/structure.getObservationCount());
+        System.out.printf("Error before %.4f\n", errorBefore);
+        System.out.printf("Error after by %.4f\n", errorAfter);
+        System.out.printf("Error reduced by %.1f%%\n", (100.0*(errorAfter/errorBefore - 1.0)));
         //this.bundleScale.undoScale(structure, observations);
     }
 }

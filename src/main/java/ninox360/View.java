@@ -89,15 +89,18 @@ public class View {
                     // Create new tracks
                     List<Integer> viewIds = new ArrayList<>();
                     List<Integer> kpIds = new ArrayList<>();
+                    List<Boolean> inliers = new ArrayList<>();
                     viewIds.add(matchViewId);
                     kpIds.add(idxPair.get(i).dst);
-                    tracks.add(new Track(tracks.size(), 1, viewIds, kpIds));
+                    inliers.add(true);
+                    tracks.add(new Track(tracks.size(), 1, viewIds, kpIds, inliers));
                     mtrkId = tracks.size() - 1;
                 }
 
                 // Update existing tracks and structure
                 tracks.get(mtrkId).viewIds.add(this.id);
                 tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
+                tracks.get(mtrkId).inliers.add(true);
                 tracks.get(mtrkId).length += 1;
                 this.trackIds.set(idxPair.get(i).src, mtrkId);
                 matchView.trackIds.set(idxPair.get(i).dst, mtrkId);
@@ -106,7 +109,28 @@ public class View {
     }
     public void triangulateTracks(List<Track> tracks, List<View> views, Config config){
         for (int trackId : this.trackIds) {
-            if (trackId != -1) tracks.get(trackId).triangulateN(views, config);
+            if (trackId != -1) {
+                tracks.get(trackId).triangulateN(views, config);
+                tracks.get(trackId).filter(views, config);
+            }
+        }
+    }
+    public void filterTracks(List<Track> tracks, List<View> views, Config config){
+        for (int trackId : this.trackIds) {
+            if (trackId != -1) {
+                tracks.get(trackId).filter(views, config);
+            }
+        }
+    }
+    public void projectTracks(List<Track> tracks, Config config){
+        for (int trackId : this.trackIds) {
+            if (trackId != -1) {
+                if (tracks.get(trackId).valid
+                        && tracks.get(trackId).inliers.get(tracks.get(trackId).viewIds.indexOf(this.id))) {
+                    Point2D_F64 kprj = tracks.get(trackId).project(this, config);
+                    this.prj.add(kprj);
+                }
+            }
         }
     }
     public void normKps(Config config){
@@ -177,16 +201,7 @@ public class View {
         //structure.setView(id, 0, true, views.get(id).conns.get(0).getMotion(), mid);
     }
 
-    public void projectTracks(List<Track> tracks, Config config){
-        for (int trackId : this.trackIds) {
-            if (trackId != -1) {
-                if (tracks.get(trackId).valid) {
-                    Point2D_F64 kprj = tracks.get(trackId).project(this, config);
-                    this.prj.add(kprj);
-                }
-            }
-        }
-    }
+
     public void viewTracks(List<Track> tracks) {
         Graphics2D vImg = this.img.createGraphics();
         for (int i = 0; i < this.kps.size(); i++) {

@@ -68,18 +68,21 @@ public class main {
             views.add(new View(viewId, imageFile, config));
 
             if (viewId != 0) {
-                // create tracks
+                // map existing tracks
+                // create new tracks
                 int mid = viewId - 1;
                 views.get(viewId).addConnection(mid, views.get(mid).dscs, config);
+                if (mid-1 >= 0) views.get(viewId).addConnection(mid-1, views.get(mid-1).dscs, config);
+
                 views.get(viewId).mapTracks(tracks, views);
 
-                // estimate pose
+                // estimate current view pose
                 views.get(viewId).estimatePose(tracks, views, config);
 
-                // triangulate tracks
+                // triangulate tracks visible in current view
                 views.get(viewId).triangulateTracks(tracks, views, config);
 
-                // Local bundle adjustment
+                // local bundle adjustment
                 Optimizer optimizer = new Optimizer(true);
                 optimizer.initGraph(tracks, views);
                 optimizer.wrapGraph(tracks, views, config);
@@ -94,11 +97,6 @@ public class main {
         optimizer.wrapGraph(tracks, views, config);
         optimizer.process();
         optimizer.unwrapGraph(tracks, views, config);
-
-        optimizer = new Optimizer(false);
-        optimizer.initGraph(tracks, views);
-        optimizer.wrapGraph(tracks, views, config);
-
 
         // Visualize
         SceneStructureMetric structure = optimizer.graph.getStructure();

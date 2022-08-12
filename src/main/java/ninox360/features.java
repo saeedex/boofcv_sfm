@@ -1,6 +1,9 @@
 package ninox360;
 
+import boofcv.abst.feature.associate.AssociateDescription;
 import boofcv.alg.descriptor.UtilFeature;
+import boofcv.factory.feature.associate.ConfigAssociateGreedy;
+import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.struct.feature.AssociatedIndex;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.image.GrayF32;
@@ -53,9 +56,14 @@ public class features {
     }
 
     public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> descA, DogArray<TupleDesc_F64> descB, Config config){
-        config.matcher.setSource(descA);
-        config.matcher.setDestination(descB);
-        config.matcher.associate();
-        return config.matcher.getMatches();
+        AssociateDescription<TupleDesc_F64> matcher =
+                FactoryAssociation.greedy(new ConfigAssociateGreedy(true, config.matcherThreshold), config.scorer);
+        matcher.setSource(descA);
+        matcher.setDestination(descB);
+        matcher.associate();
+        return matcher.getMatches();
+
+
+
     }
 }

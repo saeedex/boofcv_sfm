@@ -114,6 +114,7 @@ public class Optimizer {
             structure.points.get(j).set(track.str.x, track.str.y, track.str.z);
 
             for (int i = 0; i < track.viewIds.size(); i++) {
+                //System.out.println(track.viewIds);
                 int viewId = track.viewIds.get(i);
                 if (track.inliers.get(i) && this.viewIds.contains(viewId)) {
                     observations.views.get(this.viewIds.indexOf(viewId)).add(j,
@@ -165,5 +166,20 @@ public class Optimizer {
         System.out.printf("Error after by %.4f\n", errorAfter);
         System.out.printf("Error reduced by %.1f%%\n", (100.0*(errorAfter/errorBefore - 1.0)));
         //this.bundleScale.undoScale(structure, observations);
+    }
+
+    public void triangulateInvalidTracks(List<Track> tracks, List<View> views, Config config){
+        for (Track track: tracks) {
+            if (!track.valid) {
+                track.triangulateN(views, config);
+                track.filter(views, config);
+            }
+        }
+    }
+
+    public void filterTracks(List<Track> tracks, List<View> views, Config config){
+        for (Track track: tracks) {
+            track.filter(views, config);
+        }
     }
 }

@@ -21,6 +21,7 @@ import georegression.struct.point.Point3D_F64;
 import georegression.struct.se.Se3_F64;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.FastAccess;
+import org.ddogleg.struct.FastArray;
 import org.ejml.data.DMatrixRMaj;
 
 import java.awt.*;
@@ -73,37 +74,61 @@ public class View {
     }
 
     public void addConnection(int matchViewId, DogArray<TupleDesc_F64> matchViewDscs, Config config){
-        FastAccess<AssociatedIndex> idxPair = features.match(this.dscs, matchViewDscs, config);
-        this.conns.add(new Connection(matchViewId, idxPair, new Se3_F64()));
+        this.conns.add(new Connection(matchViewId, features.match(this.dscs, matchViewDscs, config), new Se3_F64()));
     }
     public void mapTracks(List<Track> tracks, List<View> views) {
+        //System.out.println(this.id);
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
             View matchView = views.get(matchViewId);
             FastAccess<AssociatedIndex> idxPair = conn.idxPair;
 
             for (int i = 0; i < idxPair.size; i++) {
+                int trkId = this.trackIds.get(idxPair.get(i).src);
                 int mtrkId = matchView.trackIds.get(idxPair.get(i).dst);
 
-                if (mtrkId == -1) {
-                    // Create new tracks
-                    List<Integer> viewIds = new ArrayList<>();
-                    List<Integer> kpIds = new ArrayList<>();
-                    List<Boolean> inliers = new ArrayList<>();
-                    viewIds.add(matchViewId);
-                    kpIds.add(idxPair.get(i).dst);
-                    inliers.add(true);
-                    tracks.add(new Track(tracks.size(), 1, viewIds, kpIds, inliers));
-                    mtrkId = tracks.size() - 1;
+                // If feature of the current view was NOT previously matched
+                if (trkId == -1) {
+                    // and corresponding feature of the match view was NOT previously matched
+                    if (mtrkId == -1) {
+                        // create NEW tracks
+                        List<Integer> viewIds = new ArrayList<>();
+                        List<Integer> kpIds = new ArrayList<>();
+                        List<Boolean> inliers = new ArrayList<>();
+
+                        viewIds.add(matchViewId);
+                        kpIds.add(idxPair.get(i).dst);
+                        inliers.add(true);
+                        tracks.add(new Track(tracks.size(), 1, viewIds, kpIds, inliers));
+                        mtrkId = tracks.size()-1;
+                        matchView.trackIds.set(idxPair.get(i).dst, mtrkId);
+                    }
+                    // allow only one association per pair
+                    if (!tracks.get(mtrkId).viewIds.contains(this.id)) {
+                        // update existing track and add it to the current view
+                        tracks.get(mtrkId).viewIds.add(this.id);
+                        tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
+                        tracks.get(mtrkId).inliers.add(true);
+                        tracks.get(mtrkId).length += 1;
+                        this.trackIds.set(idxPair.get(i).src, mtrkId);
+                    }
                 }
 
-                // Update existing tracks and structure
-                tracks.get(mtrkId).viewIds.add(this.id);
-                tracks.get(mtrkId).kpids.add(idxPair.get(i).src);
-                tracks.get(mtrkId).inliers.add(true);
-                tracks.get(mtrkId).length += 1;
-                this.trackIds.set(idxPair.get(i).src, mtrkId);
-                matchView.trackIds.set(idxPair.get(i).dst, mtrkId);
+                // If feature of the current view was previously matched
+                else {
+                    // and corresponding feature of the match view was NOT previously matched
+                    if (mtrkId == -1) {
+                        // allow only one association per pair
+                        if (!tracks.get(trkId).viewIds.contains(matchViewId)) {
+                            // update existing track and add it to the match view
+                            tracks.get(trkId).viewIds.add(matchViewId);
+                            tracks.get(trkId).kpids.add(idxPair.get(i).dst);
+                            tracks.get(trkId).inliers.add(true);
+                            tracks.get(trkId).length += 1;
+                            matchView.trackIds.set(idxPair.get(i).dst, trkId);
+                        }
+                    }
+                }
             }
         }
     }

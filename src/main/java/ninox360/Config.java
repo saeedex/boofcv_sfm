@@ -40,7 +40,7 @@ import java.io.File;
 public class Config {
     DetectDescribePoint<GrayF32, TupleDesc_F64> describer;
     ScoreAssociation<TupleDesc_F64> scorer;
-    AssociateDescription<TupleDesc_F64> matcher;
+    double matcherThreshold;
 
     ConfigRansac ransac;
     ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
@@ -65,9 +65,9 @@ public class Config {
         configDetector.extract = new ConfigExtract(2, 0, 5, true);
         configDetector.maxFeaturesPerScale = numFeatures;
         configDetector.initialSampleStep = 2;
+        this.matcherThreshold = matcherThreshold;
         this.describer = FactoryDetectDescribe.surfStable(configDetector, null, null,GrayF32.class);
         this.scorer = FactoryAssociation.scoreEuclidean(TupleDesc_F64.class, true);
-        this.matcher = FactoryAssociation.greedy(new ConfigAssociateGreedy(true, matcherThreshold), this.scorer);
 
         // ransac
         this.geoThreshold = inlierThreshold;

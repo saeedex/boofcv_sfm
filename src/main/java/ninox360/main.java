@@ -51,7 +51,7 @@ import java.util.List;
 public class main {
     public static void main(String[] args) throws IOException {
         // Config
-        String imageDirectory = "../dataset/01/";
+        String imageDirectory = "../dataset/04/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         List<View> views = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
@@ -79,22 +79,25 @@ public class main {
                 // triangulate tracks
                 views.get(viewId).triangulateTracks(tracks, views, config);
 
-                //Optimizer optimizer = new Optimizer();
-                //optimizer.initGraph(tracks, views);
-                //optimizer.wrapGraph(tracks, views, config);
-                //optimizer.process();
-                //optimizer.unwrapGraph(tracks, views, config);
+                // Local bundle adjustment
+                Optimizer optimizer = new Optimizer(true);
+                optimizer.initGraph(tracks, views);
+                optimizer.wrapGraph(tracks, views, config);
+                optimizer.process();
+                optimizer.unwrapGraph(tracks, views, config);
             }
             System.out.printf("Registered view: %d\n", viewId);
         }
-        // Bundle adjustment
-        Optimizer optimizer = new Optimizer();
+        // Global bundle adjustment
+        Optimizer optimizer = new Optimizer(false);
         optimizer.initGraph(tracks, views);
         optimizer.wrapGraph(tracks, views, config);
         optimizer.process();
         optimizer.unwrapGraph(tracks, views, config);
 
-
+        optimizer = new Optimizer(false);
+        optimizer.initGraph(tracks, views);
+        optimizer.wrapGraph(tracks, views, config);
 
 
         // Visualize

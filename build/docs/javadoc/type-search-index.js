@@ -1,1 +1,0 @@
-typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"ninox360","l":"Camera"},{"p":"ninox360","l":"features"},{"p":"ninox360","l":"HelloWorld"},{"p":"ninox360","l":"pose"}];updateSearchResults();

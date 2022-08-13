@@ -39,7 +39,7 @@ public class features {
     public static Feat detect(GrayF32 image, Config config){
         // specify the image to process
         config.describer.detect(image);
-        //System.out.println("Found Features: "+config.describer.getNumberOfFeatures());
+        System.out.println("Found Features: " + config.describer.getNumberOfFeatures());
 
         // store output
         List<Point2D_F64> kps = new ArrayList<>();
@@ -62,8 +62,5 @@ public class features {
         matcher.setDestination(descB);
         matcher.associate();
         return matcher.getMatches();
-
-
-
     }
 }

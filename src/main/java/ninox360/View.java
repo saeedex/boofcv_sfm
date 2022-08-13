@@ -34,10 +34,12 @@ final class Connection {
     int viewId;
     FastAccess<AssociatedIndex> idxPair;
     Se3_F64 motion;
-    public Connection(int viewId, FastAccess<AssociatedIndex> idxPair, Se3_F64 motion) {
+    double weight;
+
+    public Connection(int viewId, FastAccess<AssociatedIndex> idxPair, double weight) {
         this.viewId = viewId;
         this.idxPair = idxPair;
-        this.motion = motion;
+        this.weight = weight;
     }
     public int getViewId(){return viewId;}
     public FastAccess<AssociatedIndex> getIdxPair(){return idxPair;}
@@ -73,13 +75,25 @@ public class View {
         this.pose = pose;
     }
 
-    public void addConnection(int matchViewId, DogArray<TupleDesc_F64> matchViewDscs, Config config){
-        this.conns.add(new Connection(matchViewId, features.match(this.dscs, matchViewDscs, config), new Se3_F64()));
+    public void addConnection(List<View> views, Config config, List<Integer> conviews){
+        for (Integer matchViewId: conviews){
+            FastAccess<AssociatedIndex> idxPair = features.match(this.dscs, views.get(matchViewId).dscs, config);
+            double matchFraction = idxPair.size/(double)this.dscs.size();
+            if (this.conns.size() == 0)
+
+                this.conns.add(new Connection(matchViewId, idxPair, matchFraction));
+            else if (matchFraction > 0.4) {
+                this.conns.add(new Connection(matchViewId, idxPair, matchFraction));
+            }
+        }
+
     }
     public void mapTracks(List<Track> tracks, List<View> views) {
         //System.out.println(this.id);
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
+            System.out.printf("  %4s matches=%.2f\n", matchViewId, conn.weight);
+
             View matchView = views.get(matchViewId);
             FastAccess<AssociatedIndex> idxPair = conn.idxPair;
 
@@ -132,7 +146,30 @@ public class View {
                     // otherwise tracks are duplicates
                     else {
                         if (mtrkId != trkId) {
-                            // merge newer track to the older track
+
+                            for (int j = 0; j < tracks.get(mtrkId).viewIds.size(); j++){
+                                // allow only one association per pair
+                                int oldId = tracks.get(mtrkId).viewIds.get(j);
+                                if (!tracks.get(trkId).viewIds.contains(oldId)){
+                                    // update existing track
+                                    tracks.get(trkId).viewIds.add(oldId);
+                                    tracks.get(trkId).kpids.add(tracks.get(mtrkId).kpids.get(j));
+                                    tracks.get(trkId).inliers.add(tracks.get(mtrkId).inliers.get(j));
+                                    tracks.get(trkId).length += 1;
+
+                                }
+                                // update track ids
+                                views.get(oldId).trackIds.set(tracks.get(mtrkId).kpids.get(j), trkId);
+
+                                tracks.get(mtrkId).valid = false;
+                                tracks.get(mtrkId).viewIds = new ArrayList<>();
+                                tracks.get(mtrkId).kpids = new ArrayList<>();
+                                tracks.get(mtrkId).inliers = new ArrayList<>();
+                                tracks.get(mtrkId).length = 0;
+                            }
+
+
+                            /*
                             for (int j = 0; j < tracks.get(trkId).viewIds.size(); j++){
                                 // allow only one association per pair
                                 int newId = tracks.get(trkId).viewIds.get(j);
@@ -142,16 +179,19 @@ public class View {
                                     tracks.get(mtrkId).kpids.add(tracks.get(trkId).kpids.get(j));
                                     tracks.get(mtrkId).inliers.add(tracks.get(trkId).inliers.get(j));
                                     tracks.get(mtrkId).length += 1;
-                                    // update track ids
-                                    views.get(newId).trackIds.set(tracks.get(trkId).kpids.get(j), mtrkId);
+
                                 }
+                                // update track ids
+                                views.get(newId).trackIds.set(tracks.get(trkId).kpids.get(j), mtrkId);
+
+                                tracks.get(trkId).valid = false;
+                                tracks.get(trkId).viewIds = new ArrayList<>();
+                                tracks.get(trkId).kpids = new ArrayList<>();
+                                tracks.get(trkId).inliers = new ArrayList<>();
+                                tracks.get(trkId).length = 0;
                             }
 
-                            // remove newer track
-                            tracks.get(trkId).valid = false;
-                            tracks.get(trkId).viewIds = new ArrayList<>();
-                            tracks.get(trkId).kpids = new ArrayList<>();
-                            tracks.get(trkId).length = 0;
+                             */
                         }
                     }
                 }
@@ -173,17 +213,6 @@ public class View {
             }
         }
     }
-    public void projectTracks(List<Track> tracks, Config config){
-        for (int trackId : this.trackIds) {
-            if (trackId != -1) {
-                if (tracks.get(trackId).valid
-                        && tracks.get(trackId).inliers.get(tracks.get(trackId).viewIds.indexOf(this.id))) {
-                    Point2D_F64 kprj = tracks.get(trackId).project(this, config);
-                    this.prj.add(kprj);
-                }
-            }
-        }
-    }
     public void normKps(Config config){
         Point2D_F64 pointNorm = new Point2D_F64();
         for (Point2D_F64 kp: this.kps){
@@ -191,12 +220,11 @@ public class View {
             this.obs.add(pointNorm.copy());
         }
     }
-
     public void estimatePose(List<Track> tracks, List<View> views, Config config){
         int mid = this.conns.get(0).viewId;
         View matchView = views.get(mid);
-        Se3_F64 motionAtoB = new Se3_F64();;
-        Se3_F64 motionWorldToB = new Se3_F64();;
+        Se3_F64 motionAtoB;
+        Se3_F64 motionWorldToB = new Se3_F64();
 
         if (!config.init) {
             // collect list of matches
@@ -214,9 +242,7 @@ public class View {
                 throw new RuntimeException("Motion estimation failed");
             motionAtoB = config.epiMotion.getModelParameters();
             motionWorldToB = motionAtoB.copy();
-
             config.init = true;
-            //structure.setView(0, 0, true, views.get(0).pose, -1);
         }
         else {
             // collect list of matches
@@ -249,31 +275,22 @@ public class View {
         // set camera pose and relative motion
         this.setPose(motionWorldToB);
         this.conns.get(0).setMotion(motionAtoB);
-        //structure.setView(id, 0, true, views.get(id).conns.get(0).getMotion(), mid);
     }
-
-
-    public void viewTracks(List<Track> tracks) {
+    public void viewTracks(List<Track> tracks, Config config) {
         Graphics2D vImg = this.img.createGraphics();
         for (int i = 0; i < this.kps.size(); i++) {
             if (this.trackIds.get(i) != -1) {
-                if (tracks.get(this.trackIds.get(i)).valid) VisualizeFeatures.drawPoint(vImg,
-                        this.kps.get(i).x, this.kps.get(i).y, 2, Color.BLUE, false);
+                if (tracks.get(this.trackIds.get(i)).valid) {
+                    Point2D_F64 kprj = tracks.get(this.trackIds.get(i)).project(this, config);
+                    VisualizeFeatures.drawPoint(vImg, this.kps.get(i).x, this.kps.get(i).y, 2, Color.BLUE, false);
+                    VisualizeFeatures.drawPoint(vImg, kprj.x, kprj.y, 2, Color.RED, false);
+                }
             }
         }
     }
-    public void viewProjections(){
-        Graphics2D vImg = this.img.createGraphics();
-        for (Point2D_F64 point2D_f64 : this.prj) {
-            VisualizeFeatures.drawPoint(vImg, point2D_f64.x, point2D_f64.y, 2, Color.RED, false);
-        }
-    }
-
     public static void viewViews(List<Track> tracks, List<View> views, Config config){
         for (View view : views){
-            view.projectTracks(tracks, config);
-            view.viewTracks(tracks);
-            view.viewProjections();
+            view.viewTracks(tracks, config);
             config.gui.addImage(view.img, view.file);
         }
         ShowImages.showWindow(config.gui,"detected features", true);

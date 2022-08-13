@@ -38,25 +38,33 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 
 public class Config {
+    boolean init = false;
+    double geoThreshold;
+    /**
+     * feature detection and matching
+     */
+    double matcherThreshold;
     DetectDescribePoint<GrayF32, TupleDesc_F64> describer;
     ScoreAssociation<TupleDesc_F64> scorer;
-    double matcherThreshold;
-
-    ConfigRansac ransac;
-    ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
-
-    ModelMatcherMultiview<Se3_F64, Point2D3D> estimatePnP;
-
-    RefinePnP refinePnP;
-
-    TriangulateNViewsMetric trian;
+    /**
+     * camera model
+     */
     CameraPinholeBrown intrinsic;
     DMatrixRMaj K;
     Point2Transform2_F64 norm;
-    double geoThreshold;
-    boolean init = false;
-
-    PointCloudViewer viewer;
+    /**
+     * camera motion
+     */
+    ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
+    ModelMatcherMultiview<Se3_F64, Point2D3D> estimatePnP;
+    RefinePnP refinePnP;
+    /**
+     * triangulation
+     */
+    TriangulateNViewsMetric trian;
+    /**
+     * visualization
+     */
     ListDisplayPanel gui;
 
     public Config(int numFeatures, double matcherThreshold, double inlierThreshold){
@@ -82,25 +90,15 @@ public class Config {
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
 
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
-        ConfigPnP configPnP = new ConfigPnP();
-
         this.estimatePnP = FactoryMultiViewRobust.pnpRansac(new ConfigPnP(), configRansac);
         this.refinePnP = FactoryMultiView.pnpRefine(1e-12,40);
 
         // triangulation
-        // ConfigTriangulation.Type.GEOMETRIC resulted in better triangulation accuracy
         this.trian = FactoryMultiView.triangulateNViewMetric(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
 
         // Viewer
-        this.viewer = VisualizeData.createPointCloudViewer();
-        this.viewer.setCameraHFov(UtilAngle.radian(60));
-        this.viewer.getComponent().setPreferredSize(new Dimension(600, 600));
-        this.viewer.setFog(true);
-        this.viewer.setColorizer(new TwoAxisRgbPlane.Z_XY(1.0).fperiod(40));
-        this.viewer.setDotSize(1);
         this.gui = new ListDisplayPanel();
     }
-
     public void getIntrinsic(BufferedImage sample){
         int height = sample.getHeight();
         int width = sample.getWidth();
@@ -109,7 +107,6 @@ public class Config {
         this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
         this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
     }
-
     public boolean loadIntrinsic(String imageDirectory){
         File file = new File(imageDirectory,"intrinsic.yaml");
         boolean flag = false;

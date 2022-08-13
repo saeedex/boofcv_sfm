@@ -5,13 +5,19 @@ import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.cloud.PointCloudReader;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.WorldToCameraToPixel;
+import boofcv.alg.mvs.ColorizeMultiViewStereoResults;
+import boofcv.core.image.LookUpColorRgbFormats;
+import boofcv.io.image.LookUpImageFilesByIndex;
 import boofcv.io.points.PointCloudIO;
 import boofcv.struct.Point3dRgbI_F64;
 import boofcv.struct.geo.AssociatedPair;
 import georegression.struct.point.Point2D_F64;
 import georegression.struct.point.Point3D_F64;
+import georegression.struct.point.Point4D_F64;
 import georegression.struct.se.Se3_F64;
 import georegression.transform.se.SePointOps_F64;
+import org.ddogleg.struct.DogArray;
+import org.ddogleg.struct.DogArray_I32;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -29,7 +35,6 @@ public class Track {
     List<Integer> viewIds;
     List<Integer> kpids;
     List<Boolean> inliers;
-
     Point3D_F64 str = new Point3D_F64();
     boolean valid = false;
 
@@ -53,7 +58,6 @@ public class Track {
             matches.add(view.obs.get(this.kpids.get(i)));
             poses.add(view.pose);
         }
-
         if (config.trian.triangulate(matches, poses, pt)) {
             if (pt.z > 0) {
                 this.str = pt;
@@ -85,25 +89,5 @@ public class Track {
         WorldToCameraToPixel worldToPixel = PerspectiveOps.createWorldToPixel(config.intrinsic, view.pose);
         worldToPixel.transform(this.str, kps);
         return kps;
-    }
-
-    public static void saveCloud(SceneStructureMetric structure, Config config) throws IOException {
-        List<Point3dRgbI_F64> cloud = new ArrayList<>();
-        for (int i = 0; i < structure.points.size; i++) {
-            Point3D_F64 world = new Point3D_F64();
-            structure.points.get(i).get(world);
-            cloud.add(new Point3dRgbI_F64(world.getX(), world.getY(), world.getZ(), 255));
-        }
-        cloud.toArray(new Point3dRgbI_F64[0]);
-        OutputStream out = new FileOutputStream("saved_cloud.ply");
-        PointCloudIO.save3D(PointCloudIO.Format.PLY, PointCloudReader.wrapF64RGB(cloud), true, out);
-    }
-
-    public static void addCloud2viewer(SceneStructureMetric structure, Config config){
-        for (int i = 0; i < structure.points.size; i++) {
-            Point3D_F64 world = new Point3D_F64();
-            structure.points.get(i).get(world);
-            config.viewer.addPoint(world.getX(), world.getY(), world.getZ(), 255);
-        }
     }
 }

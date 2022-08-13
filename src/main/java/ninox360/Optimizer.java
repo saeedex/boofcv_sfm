@@ -16,6 +16,7 @@ import boofcv.io.image.LookUpImageFilesByIndex;
 import boofcv.io.points.PointCloudIO;
 import boofcv.struct.Point3dRgbI_F64;
 import boofcv.visualize.PointCloudViewer;
+import boofcv.visualize.TwoAxisRgbPlane;
 import boofcv.visualize.VisualizeData;
 import georegression.metric.UtilAngle;
 import georegression.struct.point.Point4D_F64;

@@ -134,7 +134,7 @@ public class View {
             }
             // more careful with loop closure
             // checking match ratio and geometric inliers before adding loop closure connection
-            else if (weight > 0.4) {
+            else if (weight > 0.3) {
                 Connection conn = new Connection(matchViewId, idxPair);
                 double newweight = conn.estimateMotion(this.id, tracks, views, config);
                 conn.setWeight(newweight);

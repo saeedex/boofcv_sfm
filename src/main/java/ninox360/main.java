@@ -13,7 +13,7 @@ import java.util.List;
 public class main {
     public static void main(String[] args) throws IOException {
         // Config
-        String imageDirectory = "../dataset/01/";
+        String imageDirectory = "dataset/04/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         Config config = new Config(1000, 0.8, 2.0);
         if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));

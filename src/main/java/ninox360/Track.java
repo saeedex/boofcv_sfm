@@ -1,44 +1,28 @@
 package ninox360;
 
-import boofcv.abst.geo.bundle.SceneStructureCommon;
-import boofcv.abst.geo.bundle.SceneStructureMetric;
-import boofcv.alg.cloud.PointCloudReader;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.WorldToCameraToPixel;
-import boofcv.alg.mvs.ColorizeMultiViewStereoResults;
-import boofcv.core.image.LookUpColorRgbFormats;
-import boofcv.io.image.LookUpImageFilesByIndex;
-import boofcv.io.points.PointCloudIO;
-import boofcv.struct.Point3dRgbI_F64;
-import boofcv.struct.geo.AssociatedPair;
 import georegression.struct.point.Point2D_F64;
 import georegression.struct.point.Point3D_F64;
-import georegression.struct.point.Point4D_F64;
 import georegression.struct.se.Se3_F64;
-import georegression.transform.se.SePointOps_F64;
-import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.DogArray_I32;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import static java.lang.Math.abs;
-import static java.lang.Math.sqrt;
 
+// TODO describe what this is
 public class Track {
     int id;
     int length;
-    List<Integer> viewIds;
-    List<Integer> kpids;
+    DogArray_I32 viewIds;
+    DogArray_I32 kpids;
     List<Boolean> inliers;
     Point3D_F64 str = new Point3D_F64();
     boolean valid = false;
 
-    public Track(int id, int length, List<Integer> viewIds, List<Integer> kpids, List<Boolean> inliers){
+    public Track(int id, int length, DogArray_I32 viewIds, DogArray_I32 kpids, List<Boolean> inliers) {
         this.id = id;
         this.viewIds = viewIds;
         this.kpids = kpids;
@@ -49,15 +33,17 @@ public class Track {
     /**
      * triangulates a track.
      */
-    public void triangulateN(List<View> views, Config config){
-        Point3D_F64 pt = new Point3D_F64();
-        List<Point2D_F64> matches = new ArrayList<>();
-        List<Se3_F64> poses = new ArrayList<>();
+    public void triangulateN(List<View> views, Config config) {
+        var pt = new Point3D_F64();
+        var matches = new ArrayList<Point2D_F64>();
+        var poses = new ArrayList<Se3_F64>();
         for (int i = 0; i < this.viewIds.size(); i++) {
             View view = views.get(this.viewIds.get(i));
             matches.add(view.obs.get(this.kpids.get(i)));
-            poses.add(view.pose);
+            poses.add(view.worldToView);
         }
+
+        // TODO note that you could triangulate this in homogenous coordinates
         if (config.trian.triangulate(matches, poses, pt)) {
             if (pt.z > 0) {
                 this.str = pt;
@@ -65,8 +51,9 @@ public class Track {
             }
         }
     }
-    public void filter(List<View> views, Config config){
-        if (this.valid){
+
+    public void filter(List<View> views, Config config) {
+        if (this.valid) {
             double eucDist;
             double res = 0;
             int totInliers = 0;
@@ -76,17 +63,18 @@ public class Track {
                 eucDist = prj.distance(view.kps.get(this.kpids.get(i)));
                 if (eucDist > config.geoThreshold) {
                     this.inliers.set(i, false);
-                    totInliers +=1;
+                    totInliers += 1;
                     res += eucDist;
                 }
             }
             //if(totInliers < 2) this.valid = false;
-            if(res/totInliers > config.geoThreshold) this.valid = false;
+            if (res / totInliers > config.geoThreshold) this.valid = false;
         }
     }
-    public Point2D_F64 project(View view, Config config){
-        Point2D_F64 kps = new Point2D_F64();
-        WorldToCameraToPixel worldToPixel = PerspectiveOps.createWorldToPixel(config.intrinsic, view.pose);
+
+    public Point2D_F64 project(View view, Config config) {
+        var kps = new Point2D_F64();
+        WorldToCameraToPixel worldToPixel = PerspectiveOps.createWorldToPixel(config.intrinsic, view.worldToView);
         worldToPixel.transform(this.str, kps);
         return kps;
     }

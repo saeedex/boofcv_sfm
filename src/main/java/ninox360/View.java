@@ -1,32 +1,26 @@
 package ninox360;
 
-import boofcv.abst.geo.bundle.MetricBundleAdjustmentUtils;
-import boofcv.abst.geo.bundle.SceneObservations;
-import boofcv.abst.geo.bundle.SceneStructureMetric;
-import boofcv.alg.geo.PerspectiveOps;
-import boofcv.alg.geo.bundle.BundleAdjustmentOps;
-import boofcv.alg.geo.bundle.cameras.BundlePinholeBrown;
+import boofcv.gui.BoofSwingUtil;
 import boofcv.gui.feature.VisualizeFeatures;
+import boofcv.gui.image.ImageZoomPanel;
+import boofcv.gui.image.ScaleOptions;
 import boofcv.gui.image.ShowImages;
-import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
-import boofcv.misc.BoofMiscOps;
 import boofcv.struct.feature.AssociatedIndex;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.geo.Point2D3D;
-import boofcv.struct.image.GrayF32;
 import georegression.struct.point.Point2D_F64;
-import georegression.struct.point.Point3D_F64;
 import georegression.struct.se.Se3_F64;
+import lombok.Getter;
 import org.ddogleg.struct.DogArray;
+import org.ddogleg.struct.DogArray_I32;
 import org.ddogleg.struct.FastAccess;
-import org.ddogleg.struct.FastArray;
-import org.ejml.data.DMatrixRMaj;
 
 import java.awt.*;
-import java.awt.geom.Point2D;
+import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -80,7 +74,7 @@ final class Connection {
 
             // compute relative motion of current camera for the connection
             Se3_F64 motionBtoWorld = motionWorldToB.invert(null);
-            Se3_F64 motionWorldToA = matchView.pose;
+            Se3_F64 motionWorldToA = matchView.worldToView;
             Se3_F64 motionBtoA =  motionBtoWorld.concat(motionWorldToA, null);
             motionAtoB = motionBtoA.invert(null);
             inliers.addAll(config.estimatePnP.getMatchSet());
@@ -93,7 +87,11 @@ final class Connection {
     }
 }
 
+/**
+ * TODO Describe what this class is
+ */
 public class View {
+    // TODO add comments for the fields
     int id;
     String file;
     BufferedImage img;
@@ -101,28 +99,27 @@ public class View {
     List<Point2D_F64> obs = new ArrayList<>(); //normalized image coordinates
     List<Point2D_F64> prj = new ArrayList<>(); //projected image coordinates
     DogArray<TupleDesc_F64> dscs;
-    List<Integer> trackIds;
-    Se3_F64 pose = new Se3_F64();
+    DogArray_I32 trackIds;
+    @Getter Se3_F64 worldToView = new Se3_F64();
     List<Connection> conns = new ArrayList<>();
 
-    public View(int id, String file, Config config, Feat feat){
+    public View(int id, String file, Config config, ImgFeats feat){
         BufferedImage img = UtilImageIO.loadImageNotNull(file);
         //Feat feat = features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config);
         this.id = id;
         this.file = file;
         this.img = img;
-        this.kps = feat.getkps();
-        this.dscs = feat.getdscs();
-        this.trackIds = feat.getTrackIds();
+        this.kps = feat.kps();
+        this.dscs = feat.dscs();
+        this.trackIds = feat.trackIds();
         this.normKps(config);
     }
-    public void setPose(Se3_F64 pose){
-        this.pose = pose;
-    }
+
+    // TODO add description
     public void addConnections(List<Track> tracks, List<View> views, Config config, List<Integer> conviews){
         double numFeats = this.dscs.size();
         for (Integer matchViewId: conviews){
-            FastAccess<AssociatedIndex> idxPair = features.match(this.dscs, views.get(matchViewId).dscs, config);
+            FastAccess<AssociatedIndex> idxPair = Features.match(this.dscs, views.get(matchViewId).dscs, config);
             double weight = idxPair.size/numFeats;
 
             // add previous view connection by default
@@ -142,6 +139,8 @@ public class View {
             }
         }
     }
+
+    // TODO add description
     public void mapTracks(List<Track> tracks, List<View> views) {
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
@@ -158,9 +157,9 @@ public class View {
                     // and corresponding feature of the match view was NOT previously matched
                     if (mtrkId == -1) {
                         // create NEW tracks
-                        List<Integer> viewIds = new ArrayList<>();
-                        List<Integer> kpIds = new ArrayList<>();
-                        List<Boolean> inliers = new ArrayList<>();
+                        var viewIds = new DogArray_I32();
+                        var kpIds = new DogArray_I32();
+                        var inliers = new ArrayList<Boolean>();
 
                         viewIds.add(matchViewId);
                         kpIds.add(idxPair.get(i).dst);
@@ -214,9 +213,9 @@ public class View {
                                 views.get(oldId).trackIds.set(tracks.get(mtrkId).kpids.get(j), trkId);
 
                                 tracks.get(mtrkId).valid = false;
-                                tracks.get(mtrkId).viewIds = new ArrayList<>();
-                                tracks.get(mtrkId).kpids = new ArrayList<>();
-                                tracks.get(mtrkId).inliers = new ArrayList<>();
+                                tracks.get(mtrkId).viewIds.reset();
+                                tracks.get(mtrkId).kpids.reset();
+                                tracks.get(mtrkId).inliers.clear();
                                 tracks.get(mtrkId).length = 0;
                             }
 
@@ -251,7 +250,7 @@ public class View {
     }
     public List<AssociatedPair> get2Dmatches(View matchView, Connection conn){
         // collect list of matches
-        List<AssociatedPair> matches = new ArrayList<>();
+        var matches = new ArrayList<AssociatedPair>();
         for (int i = 0; i < conn.idxPair.size; i++) {
             int srcId = conn.idxPair.get(i).src;
             int dstId = conn.idxPair.get(i).dst;
@@ -262,7 +261,7 @@ public class View {
     }
     public List<Point2D3D> get2D3Dmatches(List<Track> tracks, View matchView, Connection conn){
         // collect list of matches
-        List<Point2D3D> matches = new ArrayList<>();
+        var matches = new ArrayList<Point2D3D>();
         for (int i = 0; i < conn.idxPair.size; i++) {
             int srcId = conn.idxPair.get(i).src;
             int dstId = conn.idxPair.get(i).dst;
@@ -276,31 +275,27 @@ public class View {
         return matches;
     }
     public int numOfTracks(List<Track> tracks){
-        int cnt = 0;
-        for (int trackId : this.trackIds) {
-            if (trackId != -1) {
-                if (tracks.get(trackId).valid) cnt += 1;
-            }
-        }
-        return cnt;
+        return trackIds.count(trackId -> trackId != -1 && tracks.get(trackId).valid);
     }
     public void triangulateTracks(List<Track> tracks, List<View> views, Config config){
-        for (int trackId : this.trackIds) {
+        trackIds.forEach(trackId->{
             if (trackId != -1) {
                 tracks.get(trackId).triangulateN(views, config);
                 tracks.get(trackId).filter(views, config);
             }
-        }
+        });
     }
+
     public void filterTracks(List<Track> tracks, List<View> views, Config config){
-        for (int trackId : this.trackIds) {
+        trackIds.forEach(trackId->{
             if (trackId != -1) {
                 tracks.get(trackId).filter(views, config);
             }
-        }
+        });
     }
+
     public void normKps(Config config){
-        Point2D_F64 pointNorm = new Point2D_F64();
+        var pointNorm = new Point2D_F64();
         for (Point2D_F64 kp: this.kps){
             config.norm.compute(kp.x, kp.y, pointNorm);
             this.obs.add(pointNorm.copy());
@@ -311,19 +306,33 @@ public class View {
 
         int matchViewId = this.conns.get(0).viewId;
         Se3_F64 motionAtoB = this.conns.get(0).getMotion();
+
         // concatenate pose
-        Se3_F64 motionWorldToB =  views.get(matchViewId).pose.concat(motionAtoB, null);
-        this.setPose(motionWorldToB);
+        Se3_F64 motionWorldToB = views.get(matchViewId).worldToView.concat(motionAtoB, null);
+        this.worldToView.setTo(motionWorldToB);
     }
 
+    /**
+     * Visualizes tracks showing differences between predicted and observed locations
+     */
     public void viewTracks(List<Track> tracks, Config config) {
-        Graphics2D vImg = this.img.createGraphics();
+        Graphics2D g2 = this.img.createGraphics();
+        BoofSwingUtil.antialiasing(g2);
+        g2.setStroke(new BasicStroke(2));
+        int r = 4; // radius of point
+        var line = new Line2D.Double();
+
         for (int i = 0; i < this.kps.size(); i++) {
             if (this.trackIds.get(i) != -1) {
                 if (tracks.get(this.trackIds.get(i)).valid) {
                     Point2D_F64 kprj = tracks.get(this.trackIds.get(i)).project(this, config);
-                    VisualizeFeatures.drawPoint(vImg, this.kps.get(i).x, this.kps.get(i).y, 2, Color.BLUE, false);
-                    VisualizeFeatures.drawPoint(vImg, kprj.x, kprj.y, 2, Color.RED, false);
+
+                    // Draw a line indicating reprojection error
+                    g2.setColor(Color.BLUE);
+                    line.setLine(kps.get(i).x, kps.get(i).y, kprj.x, kprj.y);
+                    g2.draw(line);
+                    VisualizeFeatures.drawPoint(g2, this.kps.get(i).x, this.kps.get(i).y, r, Color.BLUE, false);
+                    VisualizeFeatures.drawPoint(g2, kprj.x, kprj.y, r, Color.RED, false);
                 }
             }
         }
@@ -332,7 +341,12 @@ public class View {
     public static void viewViews(List<Track> tracks, List<View> views, Config config){
         for (View view : views){
             view.viewTracks(tracks, config);
-            config.gui.addImage(view.img, view.file);
+
+            // Display the image and let you use a mouse scroll wheel to zoom in and out
+            var imagePanel = new ImageZoomPanel();
+            imagePanel.setImage(view.img);
+            imagePanel.addMouseWheelListener(e -> imagePanel.setScale(BoofSwingUtil.mouseWheelImageZoom(imagePanel.getScale(), e)));
+            config.gui.addItem(imagePanel, new File(view.file).getName());
         }
         ShowImages.showWindow(config.gui,"detected features", true);
     }

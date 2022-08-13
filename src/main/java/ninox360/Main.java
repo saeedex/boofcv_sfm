@@ -18,6 +18,7 @@ import java.util.List;
 public class Main {
 
     public static void main(String[] args) {
+        // Need to run GUI elements while inside a GUI
         SwingUtilities.invokeLater(() -> {
             // Let the user select an image using a GUI or use the one provided as an argument
             File imageDirectory;
@@ -29,11 +30,14 @@ public class Main {
                 imageDirectory = new File(args[0]);
             }
 
-            try {
-                process(imageDirectory);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            // Run everything else in a separate thread to avoid blocking the UI
+            new Thread(() -> {
+                try {
+                    process(imageDirectory);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }).start();
         });
     }
 

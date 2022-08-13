@@ -13,6 +13,7 @@ import boofcv.struct.geo.Point2D3D;
 import georegression.struct.point.Point2D_F64;
 import georegression.struct.se.Se3_F64;
 import lombok.Getter;
+import lombok.Setter;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.DogArray_I32;
 import org.ddogleg.struct.FastAccess;
@@ -27,19 +28,17 @@ import java.util.List;
 final class Connection {
     int viewId;
     FastAccess<AssociatedIndex> idxPair;
-    private Se3_F64 motion;
-    private double weight;
+    @Getter @Setter Se3_F64 motion;
+    @Getter @Setter private double weight;
     List<AssociatedIndex> inlierPair;
 
     public Connection(int viewId, FastAccess<AssociatedIndex> idxPair) {
         this.viewId = viewId;
         this.idxPair = idxPair;
     }
-    public void setWeight(double weight){this.weight = weight;}
-    public void setMotion(Se3_F64 motion){this.motion = motion;}
-    public double getWeight(){return this.weight;}
 
-    public Se3_F64 getMotion(){return motion;}
+    // TODO: Are you not using inliers for anything? When you run SBA you're doing it off associates without
+    //       filtering outliers with the code below?
     public double estimateMotion(int viewId, List<Track> tracks, List<View> views, Config config){
         View matchView = views.get(this.viewId);
         View view = views.get(viewId);
@@ -144,7 +143,7 @@ public class View {
     public void mapTracks(List<Track> tracks, List<View> views) {
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
-            System.out.printf("  %6s: weight=%.2f\n", matchViewId, conn.getWeight());
+            System.out.printf("  %6s: weight=%.2f assoc=%d\n", matchViewId, conn.getWeight(), conn.idxPair.size);
             View matchView = views.get(matchViewId);
             FastAccess<AssociatedIndex> idxPair = conn.idxPair;
 

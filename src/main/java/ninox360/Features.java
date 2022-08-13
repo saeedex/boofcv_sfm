@@ -28,7 +28,6 @@ public class Features {
     public static ImgFeats detect(GrayF32 image, Config config){
         // specify the image to process
         config.describer.detect(image);
-        System.out.println("Found Features: " + config.describer.getNumberOfFeatures());
 
         // store output
         var kps = new ArrayList<Point2D_F64>();

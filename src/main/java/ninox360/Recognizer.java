@@ -35,10 +35,12 @@ public class Recognizer {
         this.outDir = new File(imageDirectory, "example_recognition");
     }
     public void detectFeat(List<String> imageFiles, Config config){
+        System.out.println("Detecting features:");
         featList = new ArrayList<>();
-        for (String imageFile : imageFiles){
-            BufferedImage img = UtilImageIO.loadImageNotNull(imageFile);
+        for (int i = 0; i < imageFiles.size(); i++) {
+            BufferedImage img = UtilImageIO.loadImageNotNull(imageFiles.get(i));
             featList.add(Features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config));
+            System.out.printf("  Image[%3d] features.size=%d\n", i, config.describer.getNumberOfFeatures());
         }
     }
     public void createGraph(){

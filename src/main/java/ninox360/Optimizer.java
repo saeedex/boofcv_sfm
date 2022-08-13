@@ -19,6 +19,7 @@ import boofcv.visualize.PointCloudViewer;
 import boofcv.visualize.VisualizeData;
 import georegression.metric.UtilAngle;
 import georegression.struct.point.Point4D_F64;
+import lombok.Getter;
 import org.ddogleg.optimization.lm.ConfigLevenbergMarquardt;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.DogArray_I32;
@@ -31,10 +32,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class Graph {
-    private final SceneStructureMetric structure;
-    private final SceneObservations observations;
+    @Getter final SceneStructureMetric structure;
+    @Getter private final SceneObservations observations;
 
-    private final PointCloudViewer viewer;
+    @Getter private final PointCloudViewer viewer;
 
     public Graph(SceneStructureMetric structure, SceneObservations observations) {
         this.structure = structure;
@@ -46,18 +47,6 @@ final class Graph {
         this.viewer.setFog(true);
         //this.viewer.setColorizer(new TwoAxisRgbPlane.Z_XY(1.0).fperiod(40));
         this.viewer.setDotSize(1);
-    }
-
-    public SceneStructureMetric getStructure() {
-        return structure;
-    }
-
-    public SceneObservations getObservations() {
-        return observations;
-    }
-
-    public PointCloudViewer getViewer() {
-        return viewer;
     }
 
     public void viewCloud(List<String> imageFiles) {

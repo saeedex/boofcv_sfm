@@ -13,7 +13,7 @@ import java.util.List;
 public class main {
     public static void main(String[] args) throws IOException {
         // Config
-        String imageDirectory = "../dataset/03/";
+        String imageDirectory = "../dataset/01/";
         List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
         Config config = new Config(1000, 0.8, 2.0);
         if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
@@ -30,24 +30,27 @@ public class main {
         List<Track> tracks = new ArrayList<>();
 
         for (String imageFile : imageFiles){
-            // Add view
             int viewId = views.size();
+
+            // Add new view
             views.add(new View(viewId, imageFile, config, recog.featList.get(viewId)));
-            System.out.printf("Image[%3d]\n", viewId);
+            System.out.printf("Image[%2d]\n", viewId);
 
             if (viewId != 0) {
-                // map existing tracks
-                // create new tracks
-                views.get(viewId).addConnection(views, config, recog.conns.get(viewId));
+                // Add connections to the current view (matches, relative motion)
+                views.get(viewId).addConnections(tracks, views, config, recog.conns.get(viewId));
+
+                // Map existing tracks, create new tracks
                 views.get(viewId).mapTracks(tracks, views);
 
                 // estimate current view pose
-                views.get(viewId).estimatePose(tracks, views, config);
+                //views.get(viewId).estimatePose(tracks, views, config);
+                views.get(viewId).estimatePose2(tracks, views, config);
 
-                // triangulate tracks visible in current view
+                // Triangulate tracks visible in the current view
                 views.get(viewId).triangulateTracks(tracks, views, config);
 
-                // local bundle adjustment
+                // Local bundle adjustment
                 Optimizer optimizer = new Optimizer(true);
                 optimizer.initGraph(tracks, views);
                 optimizer.wrapGraph(tracks, views, config);

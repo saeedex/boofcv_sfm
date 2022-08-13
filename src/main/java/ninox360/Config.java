@@ -38,7 +38,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 
 public class Config {
-    boolean init = false;
     double geoThreshold;
     /**
      * feature detection and matching

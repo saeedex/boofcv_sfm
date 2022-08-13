@@ -183,7 +183,6 @@ public class Optimizer {
     }
 
     public void unwrapGraph(List<Track> tracks, List<View> views, Config config){
-
         // get cameras
         SceneStructureMetric structure = this.graph.getStructure();
         BundleAdjustmentOps.convert(((BundlePinholeBrown)structure.cameras.get(0).model),
@@ -220,9 +219,8 @@ public class Optimizer {
             throw new RuntimeException("Bundle adjustment failed?!?");
         }
         double errorAfter = this.bundleAdjustment.getFitScore()/structure.getObservationCount();
-        System.out.println(this.bundleAdjustment.getFitScore()/structure.getObservationCount());
-        System.out.printf("Error before %.4f\n", errorBefore);
-        System.out.printf("Error after by %.4f\n", errorAfter);
+        //System.out.printf("Error before %.4f\n", errorBefore);
+        //System.out.printf("Error after by %.4f\n", errorAfter);
         System.out.printf("Error reduced by %.1f%%\n", (100.0*(errorAfter/errorBefore - 1.0)));
         //this.bundleScale.undoScale(structure, observations);
     }

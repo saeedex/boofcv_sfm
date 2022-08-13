@@ -33,18 +33,64 @@ import java.util.List;
 final class Connection {
     int viewId;
     FastAccess<AssociatedIndex> idxPair;
-    Se3_F64 motion;
-    double weight;
+    private Se3_F64 motion;
+    private double weight;
+    List<AssociatedIndex> inlierPair;
 
     public Connection(int viewId, FastAccess<AssociatedIndex> idxPair) {
         this.viewId = viewId;
         this.idxPair = idxPair;
     }
-    public int getViewId(){return viewId;}
-    public FastAccess<AssociatedIndex> getIdxPair(){return idxPair;}
-    public Se3_F64 getMotion(){return motion;}
-    public void setMotion(Se3_F64 motion){this.motion = motion;}
     public void setWeight(double weight){this.weight = weight;}
+    public void setMotion(Se3_F64 motion){this.motion = motion;}
+    public double getWeight(){return this.weight;}
+
+    public Se3_F64 getMotion(){return motion;}
+    public double estimateMotion(int viewId, List<Track> tracks, List<View> views, Config config){
+        View matchView = views.get(this.viewId);
+        View view = views.get(viewId);
+        Se3_F64 motionAtoB;
+        Se3_F64 motionWorldToB = new Se3_F64();
+        double weight;
+        // if no valid tracks available initialize pose
+        if (matchView.numOfTracks(tracks)==0) {
+            List<AssociatedPair> matches = view.get2Dmatches(matchView, this);
+            List<AssociatedPair> inliers = new ArrayList<>();
+            // estimate camera motion
+            config.epiMotion.setIntrinsic(0, config.intrinsic);
+            config.epiMotion.setIntrinsic(1, config.intrinsic);
+            if (!config.epiMotion.process(matches))
+                throw new RuntimeException("Motion estimation failed");
+            motionAtoB = config.epiMotion.getModelParameters();
+            inliers.addAll(config.epiMotion.getMatchSet());
+            weight = (double)inliers.size()/(double)matches.size();
+        }
+        // else use pnp to estimate pose
+        else {
+            List<Point2D3D> matches = view.get2D3Dmatches(tracks, matchView, this);
+            List<Point2D3D> inliers = new ArrayList<>();
+            // estimate camera motion
+            config.estimatePnP.setIntrinsic(0, config.intrinsic);
+            if( !config.estimatePnP.process(matches))
+                throw new RuntimeException("Motion estimation failed");
+
+            // refine the motion estimate using non-linear optimization
+            if( !config.refinePnP.fitModel(config.estimatePnP.getMatchSet(), config.estimatePnP.getModelParameters(), motionWorldToB) )
+                throw new RuntimeException("Refine failed!?!?");
+
+            // compute relative motion of current camera for the connection
+            Se3_F64 motionBtoWorld = motionWorldToB.invert(null);
+            Se3_F64 motionWorldToA = matchView.pose;
+            Se3_F64 motionBtoA =  motionBtoWorld.concat(motionWorldToA, null);
+            motionAtoB = motionBtoA.invert(null);
+            inliers.addAll(config.estimatePnP.getMatchSet());
+            weight = (double)inliers.size()/(double)matches.size();
+            //System.out.println(inliers.size());
+        }
+        // set relative motion
+        this.setMotion(motionAtoB);
+        return weight;
+    }
 }
 
 public class View {
@@ -58,7 +104,6 @@ public class View {
     List<Integer> trackIds;
     Se3_F64 pose = new Se3_F64();
     List<Connection> conns = new ArrayList<>();
-
 
     public View(int id, String file, Config config, Feat feat){
         BufferedImage img = UtilImageIO.loadImageNotNull(file);
@@ -74,93 +119,37 @@ public class View {
     public void setPose(Se3_F64 pose){
         this.pose = pose;
     }
-
     public void addConnections(List<Track> tracks, List<View> views, Config config, List<Integer> conviews){
+        double numFeats = this.dscs.size();
         for (Integer matchViewId: conviews){
             FastAccess<AssociatedIndex> idxPair = features.match(this.dscs, views.get(matchViewId).dscs, config);
-            double weight = idxPair.size/(double)this.dscs.size();
-            //todo: update weight, double check connection, geometric
+            double weight = idxPair.size/numFeats;
+
+            // add previous view connection by default
             if (this.conns.size() == 0) {
                 Connection conn = new Connection(matchViewId, idxPair);
-                evaluateConnection(tracks, views, config, conn);
-                conn.setWeight(weight);
+                double newweight = conn.estimateMotion(this.id, tracks, views, config);
+                conn.setWeight(newweight);
                 this.conns.add(conn);
             }
+            // more careful with loop closure
+            // checking match ratio and geometric inliers before adding loop closure connection
             else if (weight > 0.4) {
                 Connection conn = new Connection(matchViewId, idxPair);
-                evaluateConnection(tracks, views, config, conn);
-                conn.setWeight(weight);
-                this.conns.add(conn);
+                double newweight = conn.estimateMotion(this.id, tracks, views, config);
+                conn.setWeight(newweight);
+                if (conn.getWeight() > 0.5) this.conns.add(conn);
             }
         }
-    }
-    public void evaluateConnection(List<Track> tracks, List<View> views, Config config, Connection conn){
-        View matchView = views.get(conn.viewId);
-        Se3_F64 motionAtoB;
-        Se3_F64 motionWorldToB = new Se3_F64();
-        // if number no valid tracks available initialize pose
-        if (matchView.numOfTracks(tracks)==0) {
-            // collect list of matches
-            List<AssociatedPair> matches = new ArrayList<>();
-            for (int i = 0; i < conn.idxPair.size; i++) {
-                int srcId = conn.idxPair.get(i).src;
-                int dstId = conn.idxPair.get(i).dst;
-                var p = new AssociatedPair(matchView.obs.get(dstId), this.obs.get(srcId));
-                matches.add(p);
-            }
-
-            // estimate camera motion
-            config.epiMotion.setIntrinsic(0, config.intrinsic);
-            config.epiMotion.setIntrinsic(1, config.intrinsic);
-            if (!config.epiMotion.process(matches))
-                throw new RuntimeException("Motion estimation failed");
-            motionAtoB = config.epiMotion.getModelParameters();
-        }
-        // else use pnp to estimate pose
-        else {
-            // collect list of matches
-            List<Point2D3D> matches = new ArrayList<>();
-            for (int i = 0; i < conn.idxPair.size; i++) {
-                int srcId = conn.idxPair.get(i).src;
-                int dstId = conn.idxPair.get(i).dst;
-                int trackId = matchView.trackIds.get(dstId);
-                if (trackId != -1){
-                    if (tracks.get(trackId).valid) {
-                        matches.add(new Point2D3D(this.obs.get(srcId), tracks.get(trackId).str));
-                    }
-                }
-            }
-
-            // estimate camera motion
-            config.estimatePnP.setIntrinsic(0, config.intrinsic);
-            if( !config.estimatePnP.process(matches))
-                throw new RuntimeException("Motion estimation failed");
-
-            // refine the motion estimate using non-linear optimization
-            if( !config.refinePnP.fitModel(config.estimatePnP.getMatchSet(), config.estimatePnP.getModelParameters(), motionWorldToB) )
-                throw new RuntimeException("Refine failed!?!?");
-
-            // compute relative motion of current camera for the connection
-            Se3_F64 motionBtoWorld = motionWorldToB.invert(null);
-            Se3_F64 motionWorldToA = matchView.pose;
-            Se3_F64 motionBtoA =  motionBtoWorld.concat(motionWorldToA, null);
-            motionAtoB = motionBtoA.invert(null);
-        }
-
-        // set camera pose and relative motion
-        conn.setMotion(motionAtoB);
-        //todo: update idxPair, consider inliers
     }
     public void mapTracks(List<Track> tracks, List<View> views) {
-
         for (Connection conn : this.conns) {
             int matchViewId = conn.viewId;
-            System.out.printf("  %6s: weight=%.2f\n", matchViewId, conn.weight);
-
+            System.out.printf("  %6s: weight=%.2f\n", matchViewId, conn.getWeight());
             View matchView = views.get(matchViewId);
             FastAccess<AssociatedIndex> idxPair = conn.idxPair;
 
-            for (int i = 0; i < idxPair.size; i++) {
+            for (int i = 0; i < idxPair.size(); i++) {
                 int trkId = this.trackIds.get(idxPair.get(i).src);
                 int mtrkId = matchView.trackIds.get(idxPair.get(i).dst);
 
@@ -231,7 +220,6 @@ public class View {
                                 tracks.get(mtrkId).length = 0;
                             }
 
-
                             /*
                             for (int j = 0; j < tracks.get(trkId).viewIds.size(); j++){
                                 // allow only one association per pair
@@ -260,6 +248,32 @@ public class View {
                 }
             }
         }
+    }
+    public List<AssociatedPair> get2Dmatches(View matchView, Connection conn){
+        // collect list of matches
+        List<AssociatedPair> matches = new ArrayList<>();
+        for (int i = 0; i < conn.idxPair.size; i++) {
+            int srcId = conn.idxPair.get(i).src;
+            int dstId = conn.idxPair.get(i).dst;
+            var p = new AssociatedPair(matchView.obs.get(dstId), this.obs.get(srcId));
+            matches.add(p);
+        }
+        return matches;
+    }
+    public List<Point2D3D> get2D3Dmatches(List<Track> tracks, View matchView, Connection conn){
+        // collect list of matches
+        List<Point2D3D> matches = new ArrayList<>();
+        for (int i = 0; i < conn.idxPair.size; i++) {
+            int srcId = conn.idxPair.get(i).src;
+            int dstId = conn.idxPair.get(i).dst;
+            int trackId = matchView.trackIds.get(dstId);
+            if (trackId != -1){
+                if (tracks.get(trackId).valid) {
+                    matches.add(new Point2D3D(this.obs.get(srcId), tracks.get(trackId).str));
+                }
+            }
+        }
+        return matches;
     }
     public int numOfTracks(List<Track> tracks){
         int cnt = 0;
@@ -292,73 +306,16 @@ public class View {
             this.obs.add(pointNorm.copy());
         }
     }
-    public void estimatePose2(List<Track> tracks, List<View> views, Config config){
-        //Se3_F64 motionWorldToB = new Se3_F64();
-        // find best match view based on connection weight
+    public void estimatePose(List<Track> tracks, List<View> views, Config config){
+        // todo estimate pose from best connection based on weight
+
         int matchViewId = this.conns.get(0).viewId;
         Se3_F64 motionAtoB = this.conns.get(0).getMotion();
         // concatenate pose
         Se3_F64 motionWorldToB =  views.get(matchViewId).pose.concat(motionAtoB, null);
         this.setPose(motionWorldToB);
     }
-    public void estimatePose(List<Track> tracks, List<View> views, Config config){
-        int mid = this.conns.get(0).viewId;
-        View matchView = views.get(mid);
-        Se3_F64 motionAtoB;
-        Se3_F64 motionWorldToB = new Se3_F64();
 
-        // if number of valid tracks is zero initialize pose
-        if (this.numOfTracks(tracks)==0) {
-            // collect list of matches
-            List<AssociatedPair> matches = new ArrayList<>();
-            for (int i = 0; i < this.conns.get(0).idxPair.size; i++) {
-                int srcId = this.conns.get(0).idxPair.get(i).src;
-                int dstId = this.conns.get(0).idxPair.get(i).dst;
-                var p = new AssociatedPair(matchView.obs.get(dstId), this.obs.get(srcId));
-                matches.add(p);
-            }
-            // estimate camera motion
-            config.epiMotion.setIntrinsic(0, config.intrinsic);
-            config.epiMotion.setIntrinsic(1, config.intrinsic);
-            if (!config.epiMotion.process(matches))
-                throw new RuntimeException("Motion estimation failed");
-            motionAtoB = config.epiMotion.getModelParameters();
-            motionWorldToB = motionAtoB.copy();
-        }
-        // else use pnp to estimate pose
-        else {
-            // collect list of matches
-            List<Point2D3D> matches = new ArrayList<>();
-            for (int i = 0; i < this.conns.get(0).idxPair.size; i++) {
-                int srcId = this.conns.get(0).idxPair.get(i).src;
-                int trackId = this.trackIds.get(srcId);
-                if (trackId != -1){
-                    if (tracks.get(trackId).valid) {
-                        matches.add(new Point2D3D(this.obs.get(srcId), tracks.get(trackId).str));
-                    }
-                }
-            }
-
-            // estimate camera motion
-            config.estimatePnP.setIntrinsic(0, config.intrinsic);
-            if( !config.estimatePnP.process(matches))
-                throw new RuntimeException("Motion estimation failed");
-
-            // refine the motion estimate using non-linear optimization
-            if( !config.refinePnP.fitModel(config.estimatePnP.getMatchSet(), config.estimatePnP.getModelParameters(), motionWorldToB) )
-                throw new RuntimeException("Refine failed!?!?");
-
-            // compute relative motion of current camera for the connection
-            Se3_F64 motionBtoWorld = motionWorldToB.invert(null);
-            Se3_F64 motionWorldToA = matchView.pose;
-            Se3_F64 motionBtoA =  motionBtoWorld.concat(motionWorldToA, null);
-            motionAtoB = motionBtoA.invert(null);
-        }
-
-        // set camera pose and relative motion
-        this.setPose(motionWorldToB);
-        this.conns.get(0).setMotion(motionAtoB);
-    }
     public void viewTracks(List<Track> tracks, Config config) {
         Graphics2D vImg = this.img.createGraphics();
         for (int i = 0; i < this.kps.size(); i++) {
@@ -371,6 +328,7 @@ public class View {
             }
         }
     }
+
     public static void viewViews(List<Track> tracks, List<View> views, Config config){
         for (View view : views){
             view.viewTracks(tracks, config);

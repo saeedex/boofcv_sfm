@@ -30,6 +30,7 @@ import boofcv.visualize.TwoAxisRgbPlane;
 import boofcv.visualize.VisualizeData;
 import georegression.metric.UtilAngle;
 import georegression.struct.se.Se3_F64;
+import org.ddogleg.fitting.modelset.ModelMatcher;
 import org.ddogleg.optimization.lm.ConfigLevenbergMarquardt;
 import org.ejml.data.DMatrixRMaj;
 
@@ -54,6 +55,7 @@ public class Config {
     /**
      * camera motion
      */
+    ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
     ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
     ModelMatcherMultiview<Se3_F64, Point2D3D> estimatePnP;
     RefinePnP refinePnP;
@@ -88,6 +90,7 @@ public class Config {
         configEssential.numResolve = 2;
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
 
+        this.essRansac = FactoryMultiViewRobust.essentialRansac(configEssential, configRansac);
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
         this.estimatePnP = FactoryMultiViewRobust.pnpRansac(new ConfigPnP(), configRansac);
         this.refinePnP = FactoryMultiView.pnpRefine(1e-12,40);

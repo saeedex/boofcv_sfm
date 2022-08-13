@@ -1,18 +1,11 @@
 package ninox360;
 
-import boofcv.abst.feature.associate.AssociateDescription;
-import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.abst.scene.FeatureSceneRecognition;
 import boofcv.abst.scene.SceneRecognition;
 import boofcv.abst.scene.WrapFeatureToSceneRecognition;
 import boofcv.abst.scene.nister2006.ConfigRecognitionNister2006;
-import boofcv.alg.mvs.ColorizeMultiViewStereoResults;
-import boofcv.core.image.LookUpColorRgbFormats;
-import boofcv.factory.feature.associate.ConfigAssociateGreedy;
-import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.scene.FactorySceneRecognition;
 import boofcv.io.image.ConvertBufferedImage;
-import boofcv.io.image.LookUpImageFilesByIndex;
 import boofcv.io.image.UtilImageIO;
 import boofcv.io.recognition.RecognitionIO;
 import boofcv.misc.BoofMiscOps;
@@ -20,11 +13,8 @@ import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.image.GrayF32;
 import boofcv.struct.image.GrayU8;
 import georegression.struct.point.Point2D_F64;
-import georegression.struct.point.Point4D_F64;
 import org.ddogleg.struct.DogArray;
-import org.ddogleg.struct.DogArray_I32;
 import org.ddogleg.struct.FastAccess;
-
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
@@ -73,7 +63,7 @@ public class Recognizer {
     }
     public void wrapFeat(){
         // Put feature information into a format scene recognition understands
-        this.listRecFeat = new ArrayList<FeatureSceneRecognition.Features<TupleDesc_F64>>();
+        this.listRecFeat = new ArrayList<>();
         for (Feat feat : featList) {
             List<Point2D_F64> pixels = feat.getkps();
             FastAccess<TupleDesc_F64> descs = feat.getdscs();

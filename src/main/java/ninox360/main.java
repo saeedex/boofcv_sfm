@@ -44,12 +44,12 @@ public class main {
                 views.get(viewId).mapTracks(tracks, views);
 
                 // estimate current view pose
-                //views.get(viewId).estimatePose(tracks, views, config);
-                views.get(viewId).estimatePose2(tracks, views, config);
+                views.get(viewId).estimatePose(tracks, views, config);
 
                 // Triangulate tracks visible in the current view
                 views.get(viewId).triangulateTracks(tracks, views, config);
 
+                // todo: pose graph optimization
                 // Local bundle adjustment
                 Optimizer optimizer = new Optimizer(true);
                 optimizer.initGraph(tracks, views);

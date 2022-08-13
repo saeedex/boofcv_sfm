@@ -205,6 +205,11 @@ public class Optimizer {
                 track.str.z = world.z/ world.w;
             }
         }
+
+        // filter tracks
+        for (int i = 1; i < this.viewIds.size(); i++) {
+            views.get(this.viewIds.get(i)).filterTracks(tracks, views, config);
+        }
     }
 
     public void process(){

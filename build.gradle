@@ -5,6 +5,8 @@ allprojects {
 
 project.ext.boofcv_version = '0.41-SNAPSHOT'
 project.ext.junit_version = '5.8.1'
+project.ext.lombok_version = '1.18.20'
+project.ext.args4j_version = '2.33'
 
 apply plugin: 'java-library'
 
@@ -27,6 +29,10 @@ dependencies {
     api("org.boofcv:boofcv-core:$boofcv_version")
     api("org.boofcv:boofcv-swing:$boofcv_version")
     api("org.boofcv:applications:$boofcv_version")
+    api "args4j:args4j:$args4j_version"
+
+    compileOnly "org.projectlombok:lombok:${project.lombok_version}"
+    annotationProcessor "org.projectlombok:lombok:${project.lombok_version}"  // @Getter @Setter
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junit_version")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junit_version")

@@ -22,7 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 
 public class Recognizer {
-    ArrayList<Feat> featList;
+    ArrayList<ImgFeats> featList;
     ArrayList<FeatureSceneRecognition.Features<TupleDesc_F64>> listRecFeat;
     FeatureSceneRecognition<TupleDesc_F64> recognizer;
     List<List<Integer>> conns;
@@ -35,13 +35,15 @@ public class Recognizer {
         this.outDir = new File(imageDirectory, "example_recognition");
     }
     public void detectFeat(List<String> imageFiles, Config config){
+        System.out.println("Detecting features:");
         featList = new ArrayList<>();
-        for (String imageFile : imageFiles){
-            BufferedImage img = UtilImageIO.loadImageNotNull(imageFile);
-            featList.add(features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config));
+        for (int i = 0; i < imageFiles.size(); i++) {
+            BufferedImage img = UtilImageIO.loadImageNotNull(imageFiles.get(i));
+            featList.add(Features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config));
+            System.out.printf("  Image[%3d] features.size=%d\n", i, config.describer.getNumberOfFeatures());
         }
     }
-    public void createCraph(){
+    public void createGraph(){
         conns = new ArrayList<>();
         conns.add(new ArrayList<>());
         var matches = new DogArray<>(SceneRecognition.Match::new);
@@ -64,24 +66,13 @@ public class Recognizer {
     public void wrapFeat(){
         // Put feature information into a format scene recognition understands
         this.listRecFeat = new ArrayList<>();
-        for (Feat feat : featList) {
-            List<Point2D_F64> pixels = feat.getkps();
-            FastAccess<TupleDesc_F64> descs = feat.getdscs();
+        for (ImgFeats feat : featList) {
+            List<Point2D_F64> pixels = feat.kps();
+            FastAccess<TupleDesc_F64> descs = feat.dscs();
             this.listRecFeat.add(new FeatureSceneRecognition.Features<>() {
-                @Override
-                public Point2D_F64 getPixel(int index) {
-                    return pixels.get(index);
-                }
-
-                @Override
-                public TupleDesc_F64 getDescription(int index) {
-                    return descs.get(index);
-                }
-
-                @Override
-                public int size() {
-                    return pixels.size();
-                }
+                @Override public Point2D_F64 getPixel(int index)         { return pixels.get(index); }
+                @Override public TupleDesc_F64 getDescription(int index) { return descs.get(index); }
+                @Override public int size()                              { return pixels.size(); }
             });
         }
     }

@@ -1,19 +1,14 @@
 package ninox360;
 
-import boofcv.abst.feature.associate.AssociateDescription;
 import boofcv.abst.feature.associate.ScoreAssociation;
 import boofcv.abst.feature.detdesc.DetectDescribePoint;
 import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
 import boofcv.abst.geo.RefinePnP;
 import boofcv.abst.geo.TriangulateNViewsMetric;
-import boofcv.abst.geo.bundle.BundleAdjustment;
-import boofcv.abst.geo.bundle.ScaleSceneStructure;
-import boofcv.abst.geo.bundle.SceneStructureMetric;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.factory.distort.LensDistortionFactory;
-import boofcv.factory.feature.associate.ConfigAssociateGreedy;
 import boofcv.factory.feature.associate.FactoryAssociation;
 import boofcv.factory.feature.detdesc.FactoryDetectDescribe;
 import boofcv.factory.geo.*;
@@ -25,16 +20,10 @@ import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.geo.AssociatedPair;
 import boofcv.struct.geo.Point2D3D;
 import boofcv.struct.image.GrayF32;
-import boofcv.visualize.PointCloudViewer;
-import boofcv.visualize.TwoAxisRgbPlane;
-import boofcv.visualize.VisualizeData;
-import georegression.metric.UtilAngle;
 import georegression.struct.se.Se3_F64;
 import org.ddogleg.fitting.modelset.ModelMatcher;
-import org.ddogleg.optimization.lm.ConfigLevenbergMarquardt;
 import org.ejml.data.DMatrixRMaj;
 
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
@@ -72,7 +61,8 @@ public class Config {
         // describer and matcher
         ConfigFastHessian configDetector = new ConfigFastHessian();
         configDetector.extract = new ConfigExtract(2, 0, 5, true);
-        configDetector.maxFeaturesPerScale = numFeatures;
+        configDetector.maxFeaturesAll = numFeatures;  // TODO which do you prefer?
+//        configDetector.maxFeaturesPerScale = numFeatures;
         configDetector.initialSampleStep = 2;
         this.matcherThreshold = matcherThreshold;
         this.describer = FactoryDetectDescribe.surfStable(configDetector, null, null,GrayF32.class);
@@ -101,7 +91,11 @@ public class Config {
         // Viewer
         this.gui = new ListDisplayPanel();
     }
-    public void getIntrinsic(BufferedImage sample){
+
+    /**
+     * Open an image and assume the camera's FOV is about 60 degrees
+     */
+    public void guessIntrinsics(BufferedImage sample){
         int height = sample.getHeight();
         int width = sample.getWidth();
 

@@ -6,28 +6,58 @@ import boofcv.gui.image.ShowImages;
 import boofcv.io.UtilIO;
 import boofcv.io.image.UtilImageIO;
 import javax.swing.*;
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class main {
-    public static void main(String[] args) throws IOException {
-        // Config
-        String imageDirectory = "dataset/04/";
-        List<String> imageFiles = UtilIO.listImages( imageDirectory, true);
-        Config config = new Config(1000, 0.8, 2.0);
-        if (!config.loadIntrinsic(imageDirectory)) config.getIntrinsic(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
+/**
+ * Main class which opens the data and puts everything together.
+ */
+public class Main {
+
+    public static void main(String[] args) {
+        // Need to run GUI elements while inside a GUI
+        SwingUtilities.invokeLater(() -> {
+            // Let the user select an image using a GUI or use the one provided as an argument
+            File imageDirectory;
+            if (args.length == 0) {
+                imageDirectory = BoofSwingUtil.openFileChooser("SFM", BoofSwingUtil.FileTypes.DIRECTORIES);
+                if (imageDirectory == null)
+                    return;
+            } else {
+                imageDirectory = new File(args[0]);
+            }
+
+            // Run everything else in a separate thread to avoid blocking the UI
+            new Thread(() -> {
+                try {
+                    process(imageDirectory);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }).start();
+        });
+    }
+
+    private static void process(File imageDirectory) throws IOException {
+        // Load images and configure the settings
+        List<String> imageFiles = UtilIO.listSmartImages( imageDirectory.getPath(), true);
+        var config = new Config(1000, 0.8, 2.0);
+        if (!config.loadIntrinsic(imageDirectory.getPath()))
+            config.guessIntrinsics(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
 
         // Detect and match features
-        Recognizer recog = new Recognizer(imageDirectory, config);
+        var recog = new Recognizer(imageDirectory.getPath(), config);
         recog.detectFeat(imageFiles, config);
         recog.wrapFeat();
         recog.createModel();
-        recog.createCraph();
+        recog.createGraph();
 
         // Main Loop
-        List<View> views = new ArrayList<>();
-        List<Track> tracks = new ArrayList<>();
+        var views = new ArrayList<View>();
+        var tracks = new ArrayList<Track>();
 
         for (String imageFile : imageFiles){
             int viewId = views.size();
@@ -51,7 +81,7 @@ public class main {
 
                 // todo: pose graph optimization
                 // Local bundle adjustment
-                Optimizer optimizer = new Optimizer(true);
+                var optimizer = new Optimizer(true);
                 optimizer.initGraph(tracks, views);
                 optimizer.wrapGraph(tracks, views, config);
                 optimizer.process();
@@ -61,7 +91,7 @@ public class main {
         }
 
         // Global bundle adjustment
-        Optimizer optimizer = new Optimizer(false);
+        var optimizer = new Optimizer(false);
         optimizer.initGraph(tracks, views);
         optimizer.wrapGraph(tracks, views, config);
         optimizer.process();
@@ -72,6 +102,7 @@ public class main {
         View.viewViews(tracks, views, config);
         optimizer.graph.viewCloud(imageFiles);
         SwingUtilities.invokeLater(() -> {
+            // Opens a 3D viewer of sparse cloud. Use WASD keys and mouse to navigate
             BoofSwingUtil.visualizeCameras(structure, optimizer.graph.getViewer());
             ShowImages.showWindow(optimizer.graph.getViewer().getComponent(), "Refined Scene", true);
         });

@@ -8,7 +8,6 @@ import boofcv.struct.feature.AssociatedIndex;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.image.GrayF32;
 import georegression.struct.point.Point2D_F64;
-import lombok.Data;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.DogArray_I32;
 import org.ddogleg.struct.FastAccess;
@@ -25,6 +24,12 @@ import java.util.List;
 record ImgFeats(List<Point2D_F64> kps, DogArray<TupleDesc_F64> dscs, DogArray_I32 trackIds) {}
 
 public class Features {
+    /**
+     * detects and describes features inside an image
+     * @param image input grayscale image
+     * @param config configuration
+     * @return ImgFeats: all the feratures detected inside an image
+     */
     public static ImgFeats detect(GrayF32 image, Config config){
         // specify the image to process
         config.describer.detect(image);
@@ -43,11 +48,18 @@ public class Features {
         return new ImgFeats(kps, dscs, idx);
     }
 
-    public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> descA, DogArray<TupleDesc_F64> descB, Config config){
+    /**
+     * associates feature descriptors
+     * @param src source descriptor set
+     * @param dst destination descriptor
+     * @param config configuration
+     * @return associated feature index pairs
+     */
+    public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> src, DogArray<TupleDesc_F64> dst, Config config){
         AssociateDescription<TupleDesc_F64> matcher =
                 FactoryAssociation.greedy(new ConfigAssociateGreedy(true, config.matcherThreshold), config.scorer);
-        matcher.setSource(descA);
-        matcher.setDestination(descB);
+        matcher.setSource(src);
+        matcher.setDestination(dst);
         matcher.associate();
         return matcher.getMatches();
     }

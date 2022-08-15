@@ -44,7 +44,7 @@ public class Main {
     private static void process(File imageDirectory) throws IOException {
         // Load images and configure the settings
         List<String> imageFiles = UtilIO.listSmartImages( imageDirectory.getPath(), true);
-        var config = new Config(1000, 0.8, 2.0);
+        var config = new Config(2000, 0.8, 4.0);
         if (!config.loadIntrinsic(imageDirectory.getPath()))
             config.guessIntrinsics(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
 
@@ -55,7 +55,7 @@ public class Main {
         recog.createModel();
         recog.createGraph();
 
-        // Main Loop
+        // Main loop
         var views = new ArrayList<View>();
         var tracks = new ArrayList<Track>();
 
@@ -74,7 +74,7 @@ public class Main {
                 views.get(viewId).mapTracks(tracks, views);
 
                 // estimate current view pose
-                views.get(viewId).estimatePose(tracks, views, config);
+                views.get(viewId).estimatePose(views);
 
                 // Triangulate tracks visible in the current view
                 views.get(viewId).triangulateTracks(tracks, views, config);
@@ -86,6 +86,7 @@ public class Main {
                 optimizer.wrapGraph(tracks, views, config);
                 optimizer.process();
                 optimizer.unwrapGraph(tracks, views, config);
+
             }
             System.out.printf("Registered view: %d\n", viewId);
         }

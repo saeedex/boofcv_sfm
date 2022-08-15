@@ -27,6 +27,10 @@ import org.ejml.data.DMatrixRMaj;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
+/**
+ * Config class sets system configurations for feature detection and matching,
+ * camera intrinsics and extrinsics, triangulation and view visualization.
+ */
 public class Config {
     double geoThreshold;
     /**
@@ -57,13 +61,22 @@ public class Config {
      */
     ListDisplayPanel gui;
 
+    /**
+     * initialize the configuration
+     * @param numFeatures maximum number of features to detect per view
+     * @param matcherThreshold ratio threshold for feature matching [0-1]
+     * @param inlierThreshold geometric threshold for pose estimation/triangulation/reprojection [0-1]
+     */
     public Config(int numFeatures, double matcherThreshold, double inlierThreshold){
         // describer and matcher
         ConfigFastHessian configDetector = new ConfigFastHessian();
         configDetector.extract = new ConfigExtract(2, 0, 5, true);
-        configDetector.maxFeaturesAll = numFeatures;  // TODO which do you prefer?
+
+        // detect fixed number of features, stable performance
+        configDetector.maxFeaturesAll = numFeatures;
 //        configDetector.maxFeaturesPerScale = numFeatures;
         configDetector.initialSampleStep = 2;
+
         this.matcherThreshold = matcherThreshold;
         this.describer = FactoryDetectDescribe.surfStable(configDetector, null, null,GrayF32.class);
         this.scorer = FactoryAssociation.scoreEuclidean(TupleDesc_F64.class, true);
@@ -72,7 +85,7 @@ public class Config {
         this.geoThreshold = inlierThreshold;
         var configRansac = new ConfigRansac();
         configRansac.inlierThreshold = inlierThreshold;
-        configRansac.iterations = 400;
+        configRansac.iterations = 600;
 
         // motion
         ConfigEssential configEssential = new ConfigEssential();
@@ -103,6 +116,12 @@ public class Config {
         this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
         this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
     }
+
+    /**
+     * load camera intrinsic
+     * @param imageDirectory directory containing the intrinsic.yaml
+     * @return true if loaded
+     */
     public boolean loadIntrinsic(String imageDirectory){
         File file = new File(imageDirectory,"intrinsic.yaml");
         boolean flag = false;

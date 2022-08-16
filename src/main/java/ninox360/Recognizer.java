@@ -2,8 +2,8 @@ package ninox360;
 
 import boofcv.abst.scene.FeatureSceneRecognition;
 import boofcv.abst.scene.SceneRecognition;
-import boofcv.abst.scene.WrapFeatureToSceneRecognition;
 import boofcv.abst.scene.nister2006.ConfigRecognitionNister2006;
+import boofcv.abst.scene.nister2006.FeatureSceneRecognitionNister2006;
 import boofcv.factory.scene.FactorySceneRecognition;
 import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
@@ -11,7 +11,6 @@ import boofcv.io.recognition.RecognitionIO;
 import boofcv.misc.BoofMiscOps;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.image.GrayF32;
-import boofcv.struct.image.GrayU8;
 import georegression.struct.point.Point2D_F64;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.FastAccess;
@@ -33,11 +32,11 @@ public class Recognizer {
      * More specialized version of Recognizer where it is assumed the input is composed of image features
      * that have been detected sparsely at different pixel coordinates.
      */
-    FeatureSceneRecognition<TupleDesc_F64> recognizer;
+    FeatureSceneRecognitionNister2006<TupleDesc_F64> recognizer;
     /**
      * List of detected features {@link ImgFeats} in a format Recognizer understands.
      */
-    ArrayList<FeatureSceneRecognition.Features<TupleDesc_F64>> listRecFeat;
+    private ArrayList<FeatureSceneRecognition.Features<TupleDesc_F64>> listRecFeat;
     /**
      * List of list of {@link Connection}
      */
@@ -51,7 +50,7 @@ public class Recognizer {
         var configRecog = new ConfigRecognitionNister2006();
         configRecog.learningMinimumPointsForChildren.setFixed(20);
         this.recognizer = FactorySceneRecognition.createSceneNister2006(configRecog, config.describer::createDescription);
-        this.outDir = new File(imageDirectory, "example_recognition");
+        this.outDir = new File(imageDirectory, "recognition");
     }
 
     /**
@@ -67,6 +66,7 @@ public class Recognizer {
             featList.add(Features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config));
             System.out.printf("  Image[%3d] features.size=%d\n", i, config.describer.getNumberOfFeatures());
         }
+        wrapFeat();
     }
 
     /**
@@ -94,14 +94,10 @@ public class Recognizer {
         conns = new ArrayList<>();
         conns.add(new ArrayList<>());
         var matches = new DogArray<>(SceneRecognition.Match::new);
-
         for (int imageIdx = 1; imageIdx < featList.size(); imageIdx++) {
             int _imageIdx = imageIdx;
-            recognizer.query(
-                    /*query*/ listRecFeat.get(imageIdx),
-                    /*filter*/ ( id ) -> (_imageIdx - Integer.parseInt(id)) > 20,
-                    /*limit*/ 5, /*found matches*/ matches);
 
+            recognizer.query(/*query*/ listRecFeat.get(imageIdx),/*filter*/ ( id ) -> (_imageIdx - Integer.parseInt(id)) > 20,/*limit*/ 5, /*found matches*/ matches);
             List<Integer> conviewIds = new ArrayList<>();
             conviewIds.add(imageIdx-1); // match with previous by default
 
@@ -110,6 +106,7 @@ public class Recognizer {
             }
             conns.add(conviewIds);
         }
+
     }
 
     /**
@@ -139,9 +136,21 @@ public class Recognizer {
      */
     public void saveModel(){
         // This saves the model with the image database to disk
-        // todo: save model
         System.out.println("Saving model");
-        BoofMiscOps.profile(() -> RecognitionIO.saveFeatureToScene(
-                (WrapFeatureToSceneRecognition<GrayU8, ?>)this.recognizer, this.outDir), "");
+        RecognitionIO.saveNister2006(this.recognizer, this.outDir);
+    }
+
+    /**
+     * Loads generated scene recognition model.
+     * @return true if loaded
+     */
+    public boolean loadModel(){
+        boolean flag = false;
+        if(this.outDir.exists()) {
+            System.out.println("Loading model");
+            RecognitionIO.loadNister2006(this.outDir, this.recognizer);
+            flag = true;
+        }
+        return flag;
     }
 }

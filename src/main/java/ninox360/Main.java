@@ -51,8 +51,10 @@ public class Main {
         // Detect and match features
         var recog = new Recognizer(imageDirectory.getPath(), config);
         recog.detectFeat(imageFiles, config);
-        recog.wrapFeat();
-        recog.createModel();
+        if (!recog.loadModel()) {
+            recog.createModel();
+            recog.saveModel();
+        }
         recog.createGraph();
 
         // Main loop

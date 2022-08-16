@@ -5,6 +5,7 @@ import boofcv.gui.BoofSwingUtil;
 import boofcv.gui.image.ShowImages;
 import boofcv.io.UtilIO;
 import boofcv.io.image.UtilImageIO;
+
 import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
@@ -16,39 +17,14 @@ import java.util.List;
  * Main class which opens the data and puts everything together.
  */
 public class Main {
-
-    public static void main(String[] args) {
-        // Need to run GUI elements while inside a GUI
-        SwingUtilities.invokeLater(() -> {
-            // Let the user select an image using a GUI or use the one provided as an argument
-            File imageDirectory;
-            if (args.length == 0) {
-                imageDirectory = BoofSwingUtil.openFileChooser("SFM", BoofSwingUtil.FileTypes.DIRECTORIES);
-                if (imageDirectory == null)
-                    return;
-            } else {
-                imageDirectory = new File(args[0]);
-            }
-
-            // Run everything else in a separate thread to avoid blocking the UI
-            new Thread(() -> {
-                try {
-                    process(imageDirectory);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }).start();
-        });
-    }
-
     private static void process(File imageDirectory) throws IOException {
         // Load images and configure the settings
-        List<String> imageFiles = UtilIO.listSmartImages( imageDirectory.getPath(), true);
+        List<String> imageFiles = UtilIO.listSmartImages(imageDirectory.getPath(), true);
         var config = new Config(2000, 0.8, 4.0);
         if (!config.loadIntrinsic(imageDirectory.getPath()))
             config.guessIntrinsics(UtilImageIO.loadImageNotNull(imageFiles.get(0)));
 
-        // Detect and match features
+        // Detect and match features between views, creating a graph of potentially connected views.
         var recog = new Recognizer(imageDirectory.getPath(), config);
         recog.detectFeat(imageFiles, config);
         if (!recog.loadModel()) {
@@ -61,12 +37,12 @@ public class Main {
         var views = new ArrayList<View>();
         var tracks = new ArrayList<Track>();
 
-        for (String imageFile : imageFiles){
+        for (String imageFile : imageFiles) {
             int viewId = views.size();
 
             // Add new view
             views.add(new View(viewId, imageFile, config, recog.featList.get(viewId)));
-            System.out.printf("Image[%2d]\n", viewId);
+            System.out.printf("Image[%3d]\n", viewId);
 
             if (viewId != 0) {
                 // Add connections to the current view (matches, relative motion)
@@ -94,6 +70,7 @@ public class Main {
         }
 
         // Global bundle adjustment
+        System.out.println("\nGlobal bundle adjustment");
         var optimizer = new Optimizer(false);
         optimizer.initGraph(tracks, views);
         optimizer.wrapGraph(tracks, views, config);
@@ -115,4 +92,27 @@ public class Main {
         //CalibrationIO.save(config.intrinsic, "intrinsic.yaml");
     }
 
+    public static void main(String[] args) {
+        // Need to run GUI elements while inside a GUI
+        SwingUtilities.invokeLater(() -> {
+            // Let the user select an image using a GUI or use the one provided as an argument
+            File imageDirectory;
+            if (args.length == 0) {
+                imageDirectory = BoofSwingUtil.openFileChooser("SFM", BoofSwingUtil.FileTypes.DIRECTORIES);
+                if (imageDirectory == null)
+                    return;
+            } else {
+                imageDirectory = new File(args[0]);
+            }
+
+            // Run everything else in a separate thread to avoid blocking the UI
+            new Thread(() -> {
+                try {
+                    process(imageDirectory);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }).start();
+        });
+    }
 }

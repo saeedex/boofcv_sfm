@@ -1,3 +1,5 @@
+TODO Update readme
+
 This is a skeleton for BoofCV based vision projects. Provides a Gradle script to build and a "Hello World" example.
 The build script will download all dependencies automatically.
 

@@ -8,12 +8,12 @@ import boofcv.factory.scene.FactorySceneRecognition;
 import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
 import boofcv.io.recognition.RecognitionIO;
-import boofcv.misc.BoofMiscOps;
 import boofcv.struct.feature.TupleDesc_F64;
 import boofcv.struct.image.GrayF32;
 import georegression.struct.point.Point2D_F64;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.FastAccess;
+
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
@@ -46,7 +46,7 @@ public class Recognizer {
      */
     File outDir;
 
-    public Recognizer(String imageDirectory, Config config){
+    public Recognizer(String imageDirectory, Config config) {
         var configRecog = new ConfigRecognitionNister2006();
         configRecog.learningMinimumPointsForChildren.setFixed(20);
         this.recognizer = FactorySceneRecognition.createSceneNister2006(configRecog, config.describer::createDescription);
@@ -55,15 +55,16 @@ public class Recognizer {
 
     /**
      * Detects features {@link ImgFeats} in all images
+     *
      * @param imageFiles list of image file names
-     * @param config configuration
+     * @param config     configuration
      */
-    public void detectFeat(List<String> imageFiles, Config config){
+    public void detectFeat(List<String> imageFiles, Config config) {
         System.out.println("Detecting features:");
         featList = new ArrayList<>();
         for (int i = 0; i < imageFiles.size(); i++) {
             BufferedImage img = UtilImageIO.loadImageNotNull(imageFiles.get(i));
-            featList.add(Features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32)null), config));
+            featList.add(Features.detect(ConvertBufferedImage.convertFrom(img, (GrayF32) null), config));
             System.out.printf("  Image[%3d] features.size=%d\n", i, config.describer.getNumberOfFeatures());
         }
         wrapFeat();
@@ -72,7 +73,7 @@ public class Recognizer {
     /**
      * Wraps list of features {@link ImgFeats} to a format {@link Recognizer} understands
      */
-    public void wrapFeat(){
+    public void wrapFeat() {
         // Put feature information into a format scene recognition understands
         this.listRecFeat = new ArrayList<>();
         for (ImgFeats feat : featList) {
@@ -90,16 +91,18 @@ public class Recognizer {
      * Generates image connectivity graph.
      * For all images in a sequence it describes how is that image is connected with other images.
      */
-    public void createGraph(){
+    public void createGraph() {
         conns = new ArrayList<>();
         conns.add(new ArrayList<>());
         var matches = new DogArray<>(SceneRecognition.Match::new);
         for (int imageIdx = 1; imageIdx < featList.size(); imageIdx++) {
             int _imageIdx = imageIdx;
 
-            recognizer.query(/*query*/ listRecFeat.get(imageIdx),/*filter*/ ( id ) -> (_imageIdx - Integer.parseInt(id)) > 20,/*limit*/ 5, /*found matches*/ matches);
+            recognizer.query(/*query*/ listRecFeat.get(imageIdx),
+                             /*filter*/ (id) -> (_imageIdx - Integer.parseInt(id)) > 20,
+                             /*limit*/ 5, /*found matches*/ matches);
             List<Integer> conviewIds = new ArrayList<>();
-            conviewIds.add(imageIdx-1); // match with previous by default
+            conviewIds.add(imageIdx - 1); // match with previous by default
 
             for (var m : matches.toList()) {
                 conviewIds.add(Integer.parseInt(m.id));
@@ -112,7 +115,7 @@ public class Recognizer {
     /**
      * Generates a scene recognition model
      */
-    public void createModel(){
+    public void createModel() {
         // Pass image information in as an iterator that it understands.
         this.recognizer.learnModel(new Iterator<>() {
             int imageIndex = 0;
@@ -134,7 +137,7 @@ public class Recognizer {
     /**
      * Saves generated scene recognition model.
      */
-    public void saveModel(){
+    public void saveModel() {
         // This saves the model with the image database to disk
         System.out.println("Saving model");
         RecognitionIO.saveNister2006(this.recognizer, this.outDir);
@@ -142,11 +145,12 @@ public class Recognizer {
 
     /**
      * Loads generated scene recognition model.
+     *
      * @return true if loaded
      */
-    public boolean loadModel(){
+    public boolean loadModel() {
         boolean flag = false;
-        if(this.outDir.exists()) {
+        if (this.outDir.exists()) {
             System.out.println("Loading model");
             RecognitionIO.loadNister2006(this.outDir, this.recognizer);
             flag = true;

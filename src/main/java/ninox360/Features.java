@@ -11,6 +11,7 @@ import georegression.struct.point.Point2D_F64;
 import org.ddogleg.struct.DogArray;
 import org.ddogleg.struct.DogArray_I32;
 import org.ddogleg.struct.FastAccess;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,16 +22,18 @@ import java.util.List;
  * @param dscs     Descriptors of key points
  * @param trackIds Which track this feature is an observation of. -1 means unassigned
  */
-record ImgFeats(List<Point2D_F64> kps, DogArray<TupleDesc_F64> dscs, DogArray_I32 trackIds) {}
+record ImgFeats(List<Point2D_F64> kps, DogArray<TupleDesc_F64> dscs, DogArray_I32 trackIds) {
+}
 
 public class Features {
     /**
      * detects and describes features inside an image
-     * @param image input grayscale image
+     *
+     * @param image  input grayscale image
      * @param config configuration
-     * @return ImgFeats: all the feratures detected inside an image
+     * @return ImgFeats: all the features detected inside an image
      */
-    public static ImgFeats detect(GrayF32 image, Config config){
+    public static ImgFeats detect(GrayF32 image, Config config) {
         // specify the image to process
         config.describer.detect(image);
 
@@ -50,12 +53,13 @@ public class Features {
 
     /**
      * associates feature descriptors
-     * @param src source descriptor set
-     * @param dst destination descriptor
+     *
+     * @param src    source descriptor set
+     * @param dst    destination descriptor
      * @param config configuration
      * @return associated feature index pairs
      */
-    public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> src, DogArray<TupleDesc_F64> dst, Config config){
+    public static FastAccess<AssociatedIndex> match(DogArray<TupleDesc_F64> src, DogArray<TupleDesc_F64> dst, Config config) {
         AssociateDescription<TupleDesc_F64> matcher =
                 FactoryAssociation.greedy(new ConfigAssociateGreedy(true, config.matcherThreshold), config.scorer);
         matcher.setSource(src);

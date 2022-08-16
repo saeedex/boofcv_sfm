@@ -37,13 +37,13 @@ import java.util.List;
  */
 final class Graph {
     /**
-     *  Structure class specifies cameras, views and points. A view is a set of observed features from a specific
-     *  camera image. Views have an associated camera and specify the pose of the camera when the scene was viewed. Points
-     *  describe the scene's 3D structure.
+     * Structure class specifies cameras, views and points. A view is a set of observed features from a specific
+     * camera image. Views have an associated camera and specify the pose of the camera when the scene was viewed. Points
+     * describe the scene's 3D structure.
      */
     @Getter final SceneStructureMetric structure;
     /**
-     *  Storage for feature observation in each view. Input for bundle adjustment.
+     * Storage for feature observation in each view. Input for bundle adjustment.
      */
     @Getter private final SceneObservations observations;
     /**
@@ -65,6 +65,7 @@ final class Graph {
 
     /**
      * Visualizes 3D point cloud at {@link Track}
+     *
      * @param imageFiles image file names corresponding to views in structure.
      */
     public void viewCloud(List<String> imageFiles) {
@@ -89,7 +90,6 @@ final class Graph {
 
     /**
      * Saves 3D point cloud at {@link Track}
-     * @throws IOException
      */
     public void saveCloud() throws IOException {
         var copy = new DogArray<>(Point3dRgbI_F64::new);
@@ -152,6 +152,7 @@ public class Optimizer {
 
     /**
      * initializes scene graph.
+     *
      * @param tracks list of {@link Track}
      * @param views list of {@link View}
      */
@@ -194,6 +195,7 @@ public class Optimizer {
 
     /**
      * wraps local tracks and views to scene graph.
+     *
      * @param tracks list of {@link Track}
      * @param views list of {@link View}
      * @param config configuration
@@ -209,6 +211,7 @@ public class Optimizer {
 
     /**
      * unwraps local tracks and views back from scene graph.
+     *
      * @param tracks list of {@link Track}
      * @param views list of {@link View}
      * @param config configuration
@@ -217,9 +220,9 @@ public class Optimizer {
     public void unwrapGraph(List<Track> tracks, List<View> views, Config config) {
         // get cameras
         SceneStructureMetric structure = this.graph.getStructure();
-        BundleAdjustmentOps.convert(((BundlePinholeBrown) structure.cameras.get(0).model),
+        BundleAdjustmentOps.convert(((BundlePinholeBrown)structure.cameras.get(0).model),
                 config.intrinsic.width, config.intrinsic.height, config.intrinsic);
-        config.K = PerspectiveOps.pinholeToMatrix(config.intrinsic, (DMatrixRMaj) null);
+        config.K = PerspectiveOps.pinholeToMatrix(config.intrinsic, (DMatrixRMaj)null);
         // unwrap local views
         unwrapViews(views);
         // unwrap points to local tracks
@@ -251,32 +254,36 @@ public class Optimizer {
 
     /**
      * Wraps local views
+     *
      * @param views list of {@link View}
      */
-    public void wrapViews(List<View> views){
+    public void wrapViews(List<View> views) {
         SceneStructureMetric structure = this.graph.getStructure();
-        structure.setView(0, 0, true, views.get(this.viewIds.get(0)).worldToView, -1);
+        structure.setView(0, 0, true, views.get(this.viewIds.get(0)).motionWorldToView, -1);
         for (int i = 1; i < this.viewIds.size(); i++) {
-            structure.setView(i, 0, false, views.get(this.viewIds.get(i)).worldToView, -1);
+            structure.setView(i, 0, false, views.get(this.viewIds.get(i)).motionWorldToView, -1);
         }
     }
+
     /**
      * Unwraps local views
+     *
      * @param views list of {@link View}
      */
-    public void unwrapViews(List<View> views){
+    public void unwrapViews(List<View> views) {
         SceneStructureMetric structure = this.graph.getStructure();
         for (int i = 1; i < this.viewIds.size(); i++) {
-            views.get(this.viewIds.get(i)).worldToView.setTo(structure.getParentToView(i));
+            views.get(this.viewIds.get(i)).motionWorldToView.setTo(structure.getParentToView(i));
         }
     }
 
     /**
      * Wraps local tracks
+     *
      * @param tracks list of {@link Track}
      * @param views list of {@link View}
      */
-    public void wrapPoints(List<Track> tracks, List<View> views){
+    public void wrapPoints(List<Track> tracks, List<View> views) {
         SceneStructureMetric structure = this.graph.getStructure();
         SceneObservations observations = this.graph.getObservations();
         for (int j = 0; j < this.trackIds.size(); j++) {
@@ -288,18 +295,20 @@ public class Optimizer {
                 int viewId = track.viewIds.get(i);
                 if (track.inliers.get(i) && this.viewIds.contains(viewId)) {
                     observations.views.get(this.viewIds.indexOf(viewId)).add(j,
-                            (float) views.get(viewId).kps.get(track.kpids.get(i)).x,
-                            (float) views.get(viewId).kps.get(track.kpids.get(i)).y);
+                            (float)views.get(viewId).kps.get(track.kpids.get(i)).x,
+                            (float)views.get(viewId).kps.get(track.kpids.get(i)).y);
                     structure.connectPointToView(j, this.viewIds.indexOf(viewId));
                 }
             }
         }
     }
+
     /**
      * Unwraps local tracks
+     *
      * @param tracks list of {@link Track}
      */
-    public void unwrapPoints(List<Track> tracks){
+    public void unwrapPoints(List<Track> tracks) {
         SceneStructureMetric structure = this.graph.getStructure();
         for (int j = 0; j < this.trackIds.size(); j++) {
             Track track = tracks.get(this.trackIds.get(j));
@@ -310,30 +319,32 @@ public class Optimizer {
             track.str.z = world.z / world.w;
         }
     }
+
     /**
      * Filters local tracks
+     *
      * @param tracks list of {@link Track}
      * @param views list of {@link View}
      * @param config configuration
      */
     public void filterTracks(List<Track> tracks, List<View> views, Config config) {
-        trackIds.forEach(trackId->{
+        trackIds.forEach(trackId -> {
             tracks.get(trackId).filter(views, config);
         });
     }
+
     /**
      * Tries to retriangulate invalid local tracks.
+     *
      * @param tracks list of {@link Track}
      * @param views list of {@link View}
      * @param config configuration
      */
     public void triangulateInvalidTracks(List<Track> tracks, List<View> views, Config config) {
-        trackIds.forEach(trackId->{
+        trackIds.forEach(trackId -> {
             if (!tracks.get(trackId).valid) {
                 tracks.get(trackId).filter(views, config);
             }
         });
     }
-
-
 }

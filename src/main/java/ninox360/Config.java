@@ -32,6 +32,7 @@ import java.io.File;
  * camera intrinsics and extrinsics, triangulation and view visualization.
  */
 public class Config {
+    // TODO what does this do?
     double geoThreshold;
     /**
      * feature detection and matching
@@ -46,7 +47,7 @@ public class Config {
     DMatrixRMaj K;
     Point2Transform2_F64 norm;
     /**
-     * camera motion
+     * camera motion estimators
      */
     ModelMatcher<DMatrixRMaj, AssociatedPair> essRansac;
     ModelMatcherMultiview<Se3_F64, AssociatedPair> epiMotion;
@@ -63,22 +64,22 @@ public class Config {
 
     /**
      * initialize the configuration
-     * @param numFeatures maximum number of features to detect per view
+     *
+     * @param numFeatures      maximum number of features to detect per view
      * @param matcherThreshold ratio threshold for feature matching [0-1]
-     * @param inlierThreshold geometric threshold for pose estimation/triangulation/reprojection [0-1]
+     * @param inlierThreshold  geometric threshold for pose estimation/triangulation/reprojection [0-1]
      */
-    public Config(int numFeatures, double matcherThreshold, double inlierThreshold){
+    public Config(int numFeatures, double matcherThreshold, double inlierThreshold) {
         // describer and matcher
-        ConfigFastHessian configDetector = new ConfigFastHessian();
+        var configDetector = new ConfigFastHessian();
         configDetector.extract = new ConfigExtract(2, 0, 5, true);
 
         // detect fixed number of features, stable performance
         configDetector.maxFeaturesAll = numFeatures;
-//        configDetector.maxFeaturesPerScale = numFeatures;
         configDetector.initialSampleStep = 2;
 
         this.matcherThreshold = matcherThreshold;
-        this.describer = FactoryDetectDescribe.surfStable(configDetector, null, null,GrayF32.class);
+        this.describer = FactoryDetectDescribe.surfStable(configDetector, null, null, GrayF32.class);
         this.scorer = FactoryAssociation.scoreEuclidean(TupleDesc_F64.class, true);
 
         // ransac
@@ -88,15 +89,15 @@ public class Config {
         configRansac.iterations = 600;
 
         // motion
-        ConfigEssential configEssential = new ConfigEssential();
-        configEssential.which = EnumEssential.LINEAR_8;
+        var configEssential = new ConfigEssential();
+        configEssential.which = EnumEssential.NISTER_5;
         configEssential.numResolve = 2;
         configEssential.errorModel = ConfigEssential.ErrorModel.GEOMETRIC;
 
         this.essRansac = FactoryMultiViewRobust.essentialRansac(configEssential, configRansac);
         this.epiMotion = FactoryMultiViewRobust.baselineRansac(configEssential, configRansac);
         this.estimatePnP = FactoryMultiViewRobust.pnpRansac(new ConfigPnP(), configRansac);
-        this.refinePnP = FactoryMultiView.pnpRefine(1e-12,40);
+        this.refinePnP = FactoryMultiView.pnpRefine(1e-12, 40);
 
         // triangulation
         this.trian = FactoryMultiView.triangulateNViewMetric(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
@@ -108,26 +109,27 @@ public class Config {
     /**
      * Open an image and assume the camera's FOV is about 60 degrees
      */
-    public void guessIntrinsics(BufferedImage sample){
+    public void guessIntrinsics(BufferedImage sample) {
         int height = sample.getHeight();
         int width = sample.getWidth();
 
-        this.intrinsic = new CameraPinholeBrown(width, width, 0, width/2, height/2, width, height);
-        this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
+        this.intrinsic = new CameraPinholeBrown(width, width, 0, width / 2, height / 2, width, height);
+        this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj) null);
         this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
     }
 
     /**
      * load camera intrinsic
+     *
      * @param imageDirectory directory containing the intrinsic.yaml
      * @return true if loaded
      */
-    public boolean loadIntrinsic(String imageDirectory){
-        File file = new File(imageDirectory,"intrinsic.yaml");
+    public boolean loadIntrinsic(String imageDirectory) {
+        var file = new File(imageDirectory, "intrinsic.yaml");
         boolean flag = false;
         if (file.exists()) {
             this.intrinsic = CalibrationIO.load(file);
-            this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj)null);
+            this.K = PerspectiveOps.pinholeToMatrix(intrinsic, (DMatrixRMaj) null);
             this.norm = LensDistortionFactory.narrow(this.intrinsic).undistort_F64(true, false);
             flag = true;
         }

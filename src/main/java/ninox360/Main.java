@@ -5,6 +5,8 @@ import boofcv.gui.BoofSwingUtil;
 import boofcv.gui.image.ShowImages;
 import boofcv.io.UtilIO;
 import boofcv.io.image.UtilImageIO;
+import boofcv.misc.BoofMiscOps;
+import org.ddogleg.DDoglegConcurrency;
 
 import javax.swing.*;
 import java.io.File;
@@ -18,6 +20,9 @@ import java.util.List;
  */
 public class Main {
     private static void process(File imageDirectory) throws IOException {
+        // Enables bundle adjustment to run with threads
+        DDoglegConcurrency.USE_CONCURRENT = true;
+
         // Load images and configure the settings
         List<String> imageFiles = UtilIO.listSmartImages(imageDirectory.getPath(), true);
         var config = new Config(2000, 0.8, 4.0);
@@ -64,18 +69,21 @@ public class Main {
                 optimizer.wrapGraph(tracks, views, config);
                 optimizer.process();
                 optimizer.unwrapGraph(tracks, views, config);
-
             }
-            System.out.printf("Registered view: %d\n", viewId);
         }
 
         // Global bundle adjustment
         System.out.println("\nGlobal bundle adjustment");
         var optimizer = new Optimizer(false);
-        optimizer.initGraph(tracks, views);
-        optimizer.wrapGraph(tracks, views, config);
-        optimizer.process();
-        optimizer.unwrapGraph(tracks, views, config);
+
+        double timeBundleMS = BoofMiscOps.timeNano(() -> {
+            optimizer.initGraph(tracks, views);
+            optimizer.wrapGraph(tracks, views, config);
+            optimizer.process();
+            optimizer.unwrapGraph(tracks, views, config);
+        }) * 1e-6;
+        System.out.printf("  elapsed time: %.2f (ms)\n", timeBundleMS);
+
 
         // Visualize
         SceneStructureMetric structure = optimizer.graph.getStructure();

@@ -248,7 +248,7 @@ public class Optimizer {
             throw new RuntimeException("Bundle adjustment failed?!?");
         }
         double errorAfter = this.bundleAdjustment.getFitScore() / structure.getObservationCount();
-        System.out.printf("      Error reduced by %.1f%%\n", (100.0 * (errorAfter / errorBefore - 1.0)));
+        System.out.printf("      SBA: Error change %.1f%%\n", (100.0 * (errorAfter / errorBefore - 1.0)));
         //this.bundleScale.undoScale(structure, observations);
     }
 

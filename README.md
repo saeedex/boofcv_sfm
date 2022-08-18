@@ -1,6 +1,11 @@
-TODO Update readme
+A minimalist SfM Project based on BoofCV. 
 
-This is a skeleton for BoofCV based vision projects. Provides a Gradle script to build and a "Hello World" example.
+https://github.com/lessthanoptimal/BoofCV.git
+
+Expects a set of unordered photos with known intrinsic camera calibration.
+
+Saves output sparse point-cloud as well as recognition models.
+
 The build script will download all dependencies automatically.
 
 Recommendations:
@@ -9,6 +14,6 @@ Recommendations:
 
 Useful Commands
 - './gradlew assemble' to compile the project
-- './gradlew HelloWorldJar' to create the HelloWorld jar
-- 'java -jar HelloWorld.jar' to launch the jar. Provided so that you can test without an IDE.
+- './gradlew boofcv_sfm' to create the boofcv_sfm jar
+- 'java -jar boofcv_sfm.jar' to launch the jar. Provided so that you can test without an IDE.
 

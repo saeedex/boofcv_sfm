@@ -2,7 +2,7 @@ A minimalist SfM Project based on BoofCV.
 
 https://github.com/lessthanoptimal/BoofCV.git
 
-Expects a set of unordered photos with known intrinsic camera calibration.
+Expects a set of ordered photos with known intrinsic camera calibration.
 
 Saves output sparse point-cloud as well as recognition models.
 

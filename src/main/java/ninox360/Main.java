@@ -56,13 +56,12 @@ public class Main {
                 // Map existing tracks, create new tracks
                 views.get(viewId).mapTracks(tracks, views);
 
-                // estimate current view pose
+                // Estimate current view pose
                 views.get(viewId).estimatePose(views);
 
                 // Triangulate tracks visible in the current view
                 views.get(viewId).triangulateTracks(tracks, views, config);
 
-                // todo: pose graph optimization
                 // Local bundle adjustment
                 var optimizer = new Optimizer(true);
                 optimizer.initGraph(tracks, views);

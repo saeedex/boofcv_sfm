@@ -4,6 +4,7 @@ import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.WorldToCameraToPixel;
 import georegression.struct.point.Point2D_F64;
 import georegression.struct.point.Point3D_F64;
+import georegression.struct.point.Point4D_F64;
 import georegression.struct.se.Se3_F64;
 import org.ddogleg.struct.DogArray_I32;
 
@@ -18,10 +19,6 @@ public class Track {
      * Track index
      */
     int id;
-    /**
-     * Track length
-     */
-    int length; // TODO could this be replaced by a function length() {return kpids.size();} ?
     /**
      * List of {@link View} indices where track is visible
      */
@@ -47,11 +44,10 @@ public class Track {
      */
     boolean loop = false;
 
-    public Track(int id, int length, DogArray_I32 viewIds, DogArray_I32 kpids, List<Boolean> inliers) {
+    public Track(int id, DogArray_I32 viewIds, DogArray_I32 kpids, List<Boolean> inliers) {
         this.id = id;
         this.viewIds = viewIds;
         this.kpids = kpids;
-        this.length = length;
         this.inliers = inliers;
     }
 
@@ -61,7 +57,7 @@ public class Track {
      * @param config configuration
      */
     public void triangulateN(List<View> views, Config config) {
-        var pt = new Point3D_F64();
+        var pt = new Point4D_F64();
         var matches = new ArrayList<Point2D_F64>();
         var poses = new ArrayList<Se3_F64>();
         for (int i = 0; i < this.viewIds.size(); i++) {
@@ -70,10 +66,12 @@ public class Track {
             poses.add(view.motionWorldToView);
         }
 
-        // TODO note that you could triangulate this in homogenous coordinates
+        // triangulate in homogenous coordinates
         if (config.trian.triangulate(matches, poses, pt)) {
-            if (pt.z > 0) {
-                this.str = pt;
+            if (pt.z/pt.w > 0) {
+                this.str.x = pt.x / pt.w;
+                this.str.y = pt.y / pt.w;
+                this.str.z = pt.z / pt.w;
                 this.valid = true;
             }
         }
@@ -102,7 +100,7 @@ public class Track {
             else this.inliers.set(i, false);
         }
         if (totInliers < 2) this.valid = false;
-        if ((double)totInliers/this.length < 0.5) this.valid = false;
+        if ((double)totInliers/this.inliers.size() < 0.5) this.valid = false;
         if (res / totInliers > config.geoThreshold) this.valid = false;
     }
 
@@ -133,7 +131,7 @@ public class Track {
         viewIds.add(view.id);
         kpIds.add(obsId);
         inliers.add(true);
-        tracks.add(new Track(tracks.size(), 1, viewIds, kpIds, inliers));
+        tracks.add(new Track(tracks.size(), viewIds, kpIds, inliers));
         view.trackIds.set(obsId, tracks.size()-1);
     }
 
@@ -151,7 +149,6 @@ public class Track {
         this.viewIds.add(view.id);
         this.kpids.add(obsId);
         this.inliers.add(true);
-        this.length += 1;
         view.trackIds.set(obsId, this.id);
     }
     /**
@@ -170,7 +167,6 @@ public class Track {
             this.viewIds.add(newId);
             this.kpids.add(mtrack.kpids.get(j));
             this.inliers.add(mtrack.inliers.get(j));
-            this.length += 1;
             // update track ids
             views.get(newId).trackIds.set(mtrack.kpids.get(j), this.id);
             mtrack.valid = false;

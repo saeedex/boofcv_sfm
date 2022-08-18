@@ -6,6 +6,7 @@ import boofcv.abst.feature.detect.extract.ConfigExtract;
 import boofcv.abst.feature.detect.interest.ConfigFastHessian;
 import boofcv.abst.geo.RefinePnP;
 import boofcv.abst.geo.TriangulateNViewsMetric;
+import boofcv.abst.geo.TriangulateNViewsMetricH;
 import boofcv.alg.geo.PerspectiveOps;
 import boofcv.alg.geo.robust.ModelMatcherMultiview;
 import boofcv.factory.distort.LensDistortionFactory;
@@ -32,7 +33,9 @@ import java.io.File;
  * camera intrinsics and extrinsics, triangulation and view visualization.
  */
 public class Config {
-    // TODO what does this do?
+    /**
+     * geometric error threshold, points with reprojection error > geoThreshold are outliers
+     */
     double geoThreshold;
     /**
      * feature detection and matching
@@ -54,9 +57,9 @@ public class Config {
     ModelMatcherMultiview<Se3_F64, Point2D3D> estimatePnP;
     RefinePnP refinePnP;
     /**
-     * triangulation
+     * triangulation in homogeneous coordinates
      */
-    TriangulateNViewsMetric trian;
+    TriangulateNViewsMetricH trian;
     /**
      * visualization
      */
@@ -99,8 +102,8 @@ public class Config {
         this.estimatePnP = FactoryMultiViewRobust.pnpRansac(new ConfigPnP(), configRansac);
         this.refinePnP = FactoryMultiView.pnpRefine(1e-12, 40);
 
-        // triangulation
-        this.trian = FactoryMultiView.triangulateNViewMetric(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
+        // triangulation in homogeneous coordinates
+        this.trian = FactoryMultiView.triangulateNViewMetricH(new ConfigTriangulation(ConfigTriangulation.Type.GEOMETRIC));
 
         // Viewer
         this.gui = new ListDisplayPanel();

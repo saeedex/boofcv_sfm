@@ -39,17 +39,17 @@ dependencies {
 }
 
 // task for creating the main application jar used to detect and verify alignment of labels
-task HelloWorldJar(type: Jar) {
+task boofcv_sfm(type: Jar) {
     manifest {
-        attributes 'Implementation-Title': 'Hello World Jar',
+        attributes 'Implementation-Title': 'BoofCV SfM',
                 'Implementation-Version': project.version,
-                'Main-Class': 'ninox360.HelloWorld'
+                'Main-Class': 'ninox360.Main'
     }
 
     outputs.upToDateWhen { false }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    archiveFile.set(file('HelloWorld.jar'))
+    archiveFile.set(file('boofcv_sfm.jar'))
 
     from sourceSets.main.output
 

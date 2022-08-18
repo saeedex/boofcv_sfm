@@ -71,36 +71,34 @@ final class Connection {
         Se3_F64 motionAtoB;
         Se3_F64 motionWorldToB = new Se3_F64();
         double weight;
-        List<AssociatedPair> matches2D = view.get2Dmatches(matchView, this);
-        List<AssociatedPair> inliers = new ArrayList<>();
-
-        // Estimate motion up to a scale invariance using an Essential matrix
-        config.epiMotion.setIntrinsic(0, config.intrinsic);
-        config.epiMotion.setIntrinsic(1, config.intrinsic);
-
-        // estimate relative camera motion
-        if (!config.epiMotion.process(matches2D))
-            throw new RuntimeException("Motion estimation failed");
-
-        // set match inliers and updated weight
-        inliers.addAll(config.epiMotion.getMatchSet());
-        weight = (double)inliers.size() / (double)matches2D.size();
-        this.inlierPair = new ArrayList<>();
-        for (int i = 0; i < inliers.size(); i++) {
-            AssociatedIndex pair = this.idxPair.get(config.epiMotion.getInputIndex(i));
-            this.inlierPair.add(pair);
-        }
 
         // if no valid tracks available initialize pose using epimotion
         if (matchView.numOfTracks(tracks) == 0) {
+            List<AssociatedPair> matches2D = view.get2Dmatches(matchView, this);
+            List<AssociatedPair> inliers = new ArrayList<>();
+
+            // Estimate motion up to a scale invariance using an Essential matrix
+            config.epiMotion.setIntrinsic(0, config.intrinsic);
+            config.epiMotion.setIntrinsic(1, config.intrinsic);
+
+            // estimate relative camera motion
+            if (!config.epiMotion.process(matches2D))
+                throw new RuntimeException("Motion estimation failed");
             motionAtoB = config.epiMotion.getModelParameters();
+
+            // set match inliers and updated weight
+            inliers.addAll(config.epiMotion.getMatchSet());
+            weight = (double)inliers.size() / (double)matches2D.size();
+            this.inlierPair = new ArrayList<>();
+            for (int i = 0; i < inliers.size(); i++) {
+                this.inlierPair.add(this.idxPair.get(config.epiMotion.getInputIndex(i)));
+            }
         }
         // else use pnp to estimate pose
         else {
-            // TODO Why not go straight to PNP if you have 3D information? You can use inliers from PNP for the weight
-            //     this should speed things up a bit as RANSAC is only run once
-
             List<Point2D3D> matches2D3D = view.get2D3Dmatches(tracks, matchView, this);
+            List<Point2D3D> inliers = new ArrayList<>();
+
             // estimate camera motion
             config.estimatePnP.setIntrinsic(0, config.intrinsic);
             if (matches2D3D.size() < config.estimatePnP.getMinimumSize())
@@ -117,6 +115,15 @@ final class Connection {
             Se3_F64 motionWorldToA = matchView.motionWorldToView;
             Se3_F64 motionBtoA = motionBtoWorld.concat(motionWorldToA, null);
             motionAtoB = motionBtoA.invert(null);
+
+            // set match inliers and updated weight
+            inliers.addAll(config.estimatePnP.getMatchSet());
+            weight = (double)inliers.size() / (double)matches2D3D.size();
+            List<AssociatedIndex> newPair = new ArrayList<>();
+            for (int i = 0; i < inliers.size(); i++) {
+                newPair.add(this.inlierPair.get(config.estimatePnP.getInputIndex(i)));
+            }
+            this.inlierPair = newPair;
         }
 
         // set relative motion
@@ -316,6 +323,7 @@ public class View {
     public List<Point2D3D> get2D3Dmatches(List<Track> tracks, View matchView, Connection conn) {
         // collect list of matches
         var matches = new ArrayList<Point2D3D>();
+        conn.inlierPair = new ArrayList<>();
         for (int i = 0; i < conn.idxPair.size; i++) {
             int srcId = conn.idxPair.get(i).src;
             int dstId = conn.idxPair.get(i).dst;
@@ -323,6 +331,8 @@ public class View {
             if (trackId != -1) {
                 if (tracks.get(trackId).valid) {
                     matches.add(new Point2D3D(this.obs.get(srcId), tracks.get(trackId).str));
+                    // temporarily save the index pairs associated with valid tracks
+                    conn.inlierPair.add(conn.idxPair.get(i));
                 }
             }
         }
